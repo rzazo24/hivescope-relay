@@ -118,6 +118,30 @@ tag.
 `khatrupolicies.FilterIPRateLimiter` / `ConnectionRateLimiter` are wired the
 same way onto `RejectFilter` / `RejectConnection`.
 
+**Room expiration and cascading message cleanup**: room-metadata events
+must carry a NIP-40 `expiration` tag (validated in `NewRoomMetaPolicy`,
+required, must be a future unix timestamp) — khatru already implements
+NIP-40 natively (`expirationManager` in the khatru module itself, an
+hourly sweep, no code of ours involved) and deletes the event once it
+passes, no extra wiring needed for that half. Since the metadata event is
+NIP-33 replaceable, any update (rename, delegate admin, or the frontend's
+"edit" action even with no real change) republishes a fresh `expiration`
+further out — that's the entire "renew a room" mechanism, there's no
+separate renew endpoint or button.
+
+That only handles the room's own listing disappearing, not its chat
+history. `internal/roomsweep` is a **second**, separate background sweep
+(also hourly, started from `main.go` next to khatru's own) that deletes
+`kind:9` chat messages once the room they belong to (matched by the
+message's `t` tag against a room's `d` tag, minus the `room:` prefix) no
+longer has a live metadata event — for any reason, expired or manually
+NIP-09-deleted, roomsweep doesn't care which. This is deliberately blind to
+*why* a room disappeared and to any specific expiration timestamp: it only
+ever asks "does this room currently exist," so a renewed room's messages
+are never at risk of being cleaned up out of sync with the room itself,
+however many times it's been renewed or whenever each individual message
+was sent.
+
 **Known, intentional gaps** (explicit product decisions made in
 conversation, not oversights — don't "fix" these without asking first):
 reading (`REQ`) has zero access control, anyone can query anything stored;

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip40"
 )
 
 // RoomMetaDTagPrefix identifica, dentro del kind AppDataKind, a los eventos
@@ -20,11 +21,22 @@ const RoomMetaDTagPrefix = "room:"
 //	  ["d", "room:<sala>"]
 //	  ["name", "<nombre visible>"]
 //	  ["admin", "<pubkey_nostr_admin>"]
+//	  ["expiration", "<unix_timestamp_futuro>"]
 //
 // Reglas aplicadas:
 //  1. El nombre de sala (lo que sigue a "room:" en el tag "d") no puede estar
-//     vacío, y deben estar presentes "name" y un "admin" con forma de pubkey
-//     nostr válido (64 caracteres hex).
+//     vacío, y deben estar presentes "name", un "admin" con forma de pubkey
+//     nostr válido (64 caracteres hex) y una "expiration" (NIP-40) con forma
+//     de timestamp unix futuro. khatru ya trae soporte nativo de NIP-40 (ver
+//     su expirationManager): borra solo, sin código nuestro, cualquier
+//     evento una vez pasado su "expiration" -- por eso toda sala tiene que
+//     llevar uno, para que las abandonadas se limpien solas. Como el evento
+//     de metadatos es parametrizado reemplazable, cualquier actualización
+//     (renombrar, delegar admin) republica un "expiration" nuevo y así
+//     "renueva" la sala; no hay un botón de renovar aparte, es un efecto
+//     secundario de editar. internal/roomsweep además borra los mensajes de
+//     una sala una vez que su evento de metadatos ya no existe (por
+//     expiración o por borrado manual) -- ver ese paquete para el detalle.
 //  2. El pubkey que firma el evento debe tener ya una vinculación hive
 //     verificada (mismo requisito que para publicar mensajes de chat): solo
 //     cuentas hive vinculadas pueden crear o administrar salas.
@@ -79,6 +91,10 @@ func NewRoomMetaPolicy(queryEvents QueryEventsFunc, superadminHiveAccount string
 		admin := event.Tags.Find("admin").Value()
 		if !nostr.IsValid32ByteHex(admin) {
 			return true, "invalid: the \"admin\" tag must be a valid nostr pubkey (64 hex characters)"
+		}
+
+		if nip40.GetExpiration(event.Tags) <= nostr.Now() {
+			return true, "invalid: missing or invalid \"expiration\" tag (must be a future unix timestamp, see NIP-40) -- rooms need one so abandoned ones get cleaned up automatically"
 		}
 
 		linkedAccount, err := findLinkedHiveAccount(ctx, queryEvents, event.PubKey)

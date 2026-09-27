@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/rzazo24/hivescope-relay/internal/hiveapi"
 	"github.com/rzazo24/hivescope-relay/internal/policies"
+	"github.com/rzazo24/hivescope-relay/internal/roomsweep"
 )
 
 func main() {
@@ -74,6 +76,17 @@ func main() {
 	relay.RejectConnection = append(relay.RejectConnection,
 		khatrupolicies.ConnectionRateLimiter(10, time.Minute, 30),
 	)
+
+	// Borra los mensajes de una sala una vez que su evento de metadatos ya
+	// no existe (expirado vía NIP-40 -- que khatru ya borra solo -- o
+	// borrado a mano). Ver internal/roomsweep para el porqué de este diseño.
+	go roomsweep.Start(context.Background(), db.QueryEvents, db.DeleteEvent, time.Hour, func(deleted int, err error) {
+		if err != nil {
+			fmt.Printf("roomsweep: error en el barrido: %v\n", err)
+		} else if deleted > 0 {
+			fmt.Printf("roomsweep: %d mensaje(s) huérfano(s) borrado(s)\n", deleted)
+		}
+	})
 
 	fmt.Printf("hivescope-relay escuchando en %s (nodo hive: %s, db: %s)\n", addr, hiveNode, dbPath)
 	if err := http.ListenAndServe(addr, relay); err != nil {

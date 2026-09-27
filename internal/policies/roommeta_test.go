@@ -3,12 +3,20 @@ package policies
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
 
 const testAdminPubkey = "1111111111111111111111111111111111111111111111111111111111111111"
+
+// futureExpiration arma un tag "expiration" (NIP-40) válido para usar en los
+// eventos de metadatos de sala que se someten a la política bajo prueba.
+func futureExpiration() []string {
+	return []string{"expiration", strconv.FormatInt(time.Now().Add(24*time.Hour).Unix(), 10)}
+}
 
 // linkedEventFor arma un evento hive-link de prueba reusando pubkey también
 // como nombre de cuenta hive (no importa para la mayoría de los tests, que
@@ -58,7 +66,7 @@ func TestRoomMetaPolicy_RejectsMissingName(t *testing.T) {
 	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{
 		Kind: AppDataKind,
-		Tags: nostr.Tags{{"d", "room:general"}, {"admin", testAdminPubkey}},
+		Tags: nostr.Tags{{"d", "room:general"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, _ := policy(context.Background(), ev)
 	if !reject {
@@ -78,12 +86,51 @@ func TestRoomMetaPolicy_RejectsInvalidAdminPubkey(t *testing.T) {
 	}
 }
 
+func TestRoomMetaPolicy_RejectsMissingExpiration(t *testing.T) {
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
+	ev := &nostr.Event{
+		Kind: AppDataKind,
+		Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}},
+	}
+	reject, msg := policy(context.Background(), ev)
+	if !reject {
+		t.Fatal("debería rechazar una sala sin tag \"expiration\"")
+	}
+	if msg == "" {
+		t.Fatal("debería devolver un motivo de rechazo")
+	}
+}
+
+func TestRoomMetaPolicy_RejectsNonNumericExpiration(t *testing.T) {
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
+	ev := &nostr.Event{
+		Kind: AppDataKind,
+		Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}, {"expiration", "mañana"}},
+	}
+	reject, _ := policy(context.Background(), ev)
+	if !reject {
+		t.Fatal("debería rechazar un tag \"expiration\" que no es un timestamp unix")
+	}
+}
+
+func TestRoomMetaPolicy_RejectsExpirationInThePast(t *testing.T) {
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
+	ev := &nostr.Event{
+		Kind: AppDataKind,
+		Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}, {"expiration", "1"}},
+	}
+	reject, _ := policy(context.Background(), ev)
+	if !reject {
+		t.Fatal("debería rechazar un tag \"expiration\" que ya pasó")
+	}
+}
+
 func TestRoomMetaPolicy_RejectsWithoutHiveLink(t *testing.T) {
 	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, _ := policy(context.Background(), ev)
 	if !reject {
@@ -97,7 +144,7 @@ func TestRoomMetaPolicy_AcceptsFirstCreationByLinkedAccount(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if reject {
@@ -114,7 +161,7 @@ func TestRoomMetaPolicy_AcceptsUpdateBySameOwner(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General nuevo"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General nuevo"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if reject {
@@ -138,7 +185,7 @@ func TestRoomMetaPolicy_AcceptsUpdateByCurrentAdmin(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "delegado",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General nuevo"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General nuevo"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if reject {
@@ -177,7 +224,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	rejectCreador, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Reclamo viejo"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Reclamo viejo"}, {"admin", testAdminPubkey}, futureExpiration()},
 	})
 	if !rejectCreador {
 		t.Fatal("el creador original debería perder el control tras delegar y ser superado por una fila más nueva")
@@ -187,7 +234,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	rejectOtro, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "otro",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}, futureExpiration()},
 	})
 	if !rejectOtro {
 		t.Fatal("un tercero sin relación con la sala sigue sin poder reclamarla")
@@ -197,7 +244,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	rejectDelegado, msg := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "delegado",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General más nuevo"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General más nuevo"}, {"admin", testAdminPubkey}, futureExpiration()},
 	})
 	if rejectDelegado {
 		t.Fatalf("el delegado, autor de la fila vigente, debería poder seguir actualizando, rechazado: %s", msg)
@@ -217,7 +264,7 @@ func TestRoomMetaPolicy_SuperadminCanUpdateAnyRoom(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "operador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada por el superadmin"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada por el superadmin"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if reject {
@@ -235,7 +282,7 @@ func TestRoomMetaPolicy_SuperadminMatchIsCaseInsensitive(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "operador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if reject {
@@ -256,7 +303,7 @@ func TestRoomMetaPolicy_NonSuperadminAccountStillRejectedForOthersRooms(t *testi
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "otro",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, _ := policy(context.Background(), ev)
 	if !reject {
@@ -276,7 +323,7 @@ func TestRoomMetaPolicy_SuperadminDisabledWhenUnconfigured(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "operador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, _ := policy(context.Background(), ev)
 	if !reject {
@@ -294,7 +341,7 @@ func TestRoomMetaPolicy_RejectsClaimByDifferentPubkey(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "otro",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, _ := policy(context.Background(), ev)
 	if !reject {
@@ -307,7 +354,7 @@ func TestRoomMetaPolicy_PropagatesQueryError(t *testing.T) {
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
-		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}},
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", testAdminPubkey}, futureExpiration()},
 	}
 	reject, msg := policy(context.Background(), ev)
 	if !reject || msg == "" {

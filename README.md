@@ -20,12 +20,29 @@ before storing them.
 |---|---|---|
 | Hive↔Nostr identity link | `30078`, `d=hive-link` | `hive_sig` must be a real signature, made with the **posting** key of the `hive_account`, over the message `hivescope-relay-link:<nostr_pubkey>`. It's verified against the real posting key, queried live from a Hive node. |
 | Chat message | `9` | Requires the `t` tag (room) and that the sender pubkey already has a valid, saved link event. |
-| Room metadata | `30078`, `d=room:<room>` | Requires `name` and an `admin` (valid nostr pubkey), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its owner; from then on, only that room's current owner or the pubkey named in its `admin` tag may publish further updates (rename, or delegate admin to another account). |
+| Room metadata | `30078`, `d=room:<room>` | Requires `name`, an `admin` (valid nostr pubkey), and an `expiration` (NIP-40, a future unix timestamp), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its owner; from then on, only that room's current owner or the pubkey named in its `admin` tag may publish further updates (rename, or delegate admin to another account). |
 
 Any event that doesn't match one of these three shapes — any other kind, or
 a `30078` event with a different `d` — is rejected outright. This relay is
 not meant to be a general-purpose Nostr relay; it exists only to back the
 HiveScope chat.
+
+## Room expiration and cleanup
+
+Rooms aren't permanent: every room-metadata event carries a NIP-40
+`expiration`, and khatru deletes it automatically once that time passes —
+no custom code needed for that part, it's built into the library. Any
+update to a room (rename, delegating admin, or just re-saving it unchanged)
+publishes a fresh `expiration`, which is how a room gets "renewed" — there's
+no separate renew action.
+
+A room disappearing doesn't leave its chat history behind: a second
+background sweep (`internal/roomsweep`, also hourly) deletes a room's
+`kind:9` messages once that room's metadata event is gone, whether it
+expired or was deleted manually. It only checks whether the room currently
+exists, not why it stopped existing or when any given message was sent —
+so a room that keeps getting renewed never loses messages out of sync with
+its own lifetime.
 
 It's also rate-limited per IP, using khatru's built-in
 [`policies`](https://github.com/fiatjaf/khatru/tree/master/policies)

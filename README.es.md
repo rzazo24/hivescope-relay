@@ -20,12 +20,29 @@ antes de guardarlos.
 |---|---|---|
 | Vinculación de identidad Hive↔Nostr | `30078`, `d=hive-link` | El `hive_sig` debe ser una firma real, hecha con la clave **posting** de la cuenta `hive_account`, sobre el mensaje `hivescope-relay-link:<pubkey_nostr>`. Se verifica contra la clave posting real, consultada en vivo a un nodo Hive. |
 | Mensaje de chat | `9` | Requiere el tag `t` (sala) y que el pubkey emisor tenga ya un evento de vinculación válido guardado. |
-| Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name` y un `admin` (pubkey nostr válido), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su dueña; a partir de ahí, solo la dueña actual de la sala o el pubkey indicado en su tag `admin` pueden seguir publicando actualizaciones (renombrarla, o delegar la administración en otra cuenta). |
+| Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name`, un `admin` (pubkey nostr válido) y una `expiration` (NIP-40, timestamp unix futuro), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su dueña; a partir de ahí, solo la dueña actual de la sala o el pubkey indicado en su tag `admin` pueden seguir publicando actualizaciones (renombrarla, o delegar la administración en otra cuenta). |
 
 Cualquier evento que no encaje en una de estas tres formas —cualquier otro
 kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
 relé no está pensado como un relé Nostr de propósito general: existe solo
 para dar soporte al chat de HiveScope.
+
+## Caducidad de salas y limpieza
+
+Las salas no son permanentes: todo evento de metadatos de sala lleva una
+`expiration` NIP-40, y khatru lo borra solo una vez que pasa esa fecha —sin
+código propio para esa parte, viene incluido en la librería. Cualquier
+actualización de una sala (renombrarla, delegar admin, o simplemente
+volver a guardarla sin cambios) publica una `expiration` nueva, que es como
+se "renueva" una sala — no hay una acción de renovar aparte.
+
+Que una sala desaparezca no deja su historial de chat suelto: un segundo
+barrido de fondo (`internal/roomsweep`, también cada hora) borra los
+mensajes `kind:9` de una sala en cuanto su evento de metadatos ya no
+existe, haya expirado o se haya borrado a mano. Solo comprueba si la sala
+existe ahora mismo, no por qué dejó de existir ni cuándo se envió cada
+mensaje — así que una sala que se sigue renovando nunca pierde mensajes
+por quedar desincronizada con su propia vigencia.
 
 Además tiene límite de velocidad (rate limiting) por IP, usando el paquete
 [`policies`](https://github.com/fiatjaf/khatru/tree/master/policies) que ya
