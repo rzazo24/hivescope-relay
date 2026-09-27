@@ -72,6 +72,22 @@ is load-bearing, not incidental:
    d=room:<name>` events the same way (requires an already-linked pubkey),
    plus first-claim-wins ownership of the room name (queries for an
    existing room event with the same `d` tag from a *different* pubkey).
+   Once a room exists, further updates are accepted from either the author
+   of the currently-stored (newest) event *or* whoever that event's `admin`
+   tag names — this is how a room's creator delegates administration.
+   `findRoomOwnership` has to resolve "currently stored" by comparing
+   `created_at` (same tie-break as `eventstore/sqlite3.ReplaceEvent`: higher
+   id wins), not by taking whichever row a query happens to return last:
+   NIP-33 replacement is scoped to `(pubkey, kind, d)`, so once a *different*
+   pubkey (a delegated admin) publishes to the same `d`, there are
+   legitimately two stored rows for that room — the original creator's and
+   the delegate's — each replaceable only within its own author's series.
+   Whichever row is newest is authoritative; the other is stale but not
+   deleted. A practical consequence: delegating administration transfers
+   control forward (the delegate can rename, or delegate further), it does
+   **not** leave the original creator with a standing right to reclaim the
+   room — they'd need to be re-added to `admin` by whoever currently
+   controls it.
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay
@@ -96,11 +112,12 @@ same way onto `RejectFilter` / `RejectConnection`.
 **Known, intentional gaps** (explicit product decisions made in
 conversation, not oversights — don't "fix" these without asking first):
 reading (`REQ`) has zero access control, anyone can query anything stored;
-the `admin` tag on room-metadata events has **no enforcement** in the relay
-at all, it's purely informational for a future frontend to interpret; and a
-single Hive account can link any number of Nostr pubkeys simultaneously,
-with no revocation mechanism beyond a standard NIP-09 delete of the
-`hive-link` event itself.
+the `admin` tag's only enforced privilege is renaming/editing the room's own
+metadata (see `NewRoomMetaPolicy` above) — there's no message-deletion or
+kick/ban privilege for admins, that was explicitly scoped out when this
+feature was requested; and a single Hive account can link any number of
+Nostr pubkeys simultaneously, with no revocation mechanism beyond a
+standard NIP-09 delete of the `hive-link` event itself.
 
 **Deployment**: `Dockerfile` is multi-stage (`golang:1.27-bookworm` build
 with cgo, `debian:bookworm-slim` runtime). `docker-compose.yml` runs

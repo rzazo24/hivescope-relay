@@ -35,8 +35,13 @@ const RoomMetaDTagPrefix = "room:"
 //     único, esta política rechaza la publicación si ya existe un evento
 //     "room:<sala>" guardado con ese mismo "d" mas perteneciente a OTRO
 //     pubkey: la primera cuenta vinculada que reclama un nombre de sala pasa
-//     a ser su única dueña; solo ella podrá seguir actualizando esos
-//     metadatos (name/admin) más adelante.
+//     a ser su única dueña. A partir de ahí, solo pueden seguir actualizando
+//     esos metadatos (name/admin) quien publicó la versión vigente de la
+//     sala (su autor actual, no necesariamente quien la creó originalmente)
+//     o quien figure como "admin" en esa versión -- así, el autor vigente
+//     puede delegar la administración en otra cuenta publicando con un
+//     "admin" distinto, y desde ese momento es esa cuenta delegada la que
+//     controla la sala hacia adelante (ver findRoomOwnership).
 //
 // Eventos de otro kind, o eventos kind:30078 cuyo "d" no empieza con
 // "room:" (por ejemplo el de vinculación, "hive-link"), no son evaluados por
@@ -74,21 +79,41 @@ func NewRoomMetaPolicy(queryEvents QueryEventsFunc) func(ctx context.Context, ev
 			return true, "invalid: only linked hive accounts can create or administer rooms (missing kind 30078 d=hive-link event)"
 		}
 
-		owner, err := findRoomOwner(ctx, queryEvents, d)
+		ownership, err := findRoomOwnership(ctx, queryEvents, d)
 		if err != nil {
 			return true, fmt.Sprintf("error: could not check ownership of room %q: %v", roomSlug, err)
 		}
-		if owner != "" && owner != event.PubKey {
-			return true, fmt.Sprintf("invalid: room %q already exists and belongs to a different admin pubkey", roomSlug)
+		if ownership.owner != "" && event.PubKey != ownership.owner && event.PubKey != ownership.admin {
+			return true, fmt.Sprintf("invalid: room %q already exists and can only be updated by its creator or current admin", roomSlug)
 		}
 
 		return false, ""
 	}
 }
 
-// findRoomOwner devuelve el pubkey autor del evento kind:AppDataKind guardado
-// con tag "d" == roomDTag, o "" si todavía no existe ninguno.
-func findRoomOwner(ctx context.Context, queryEvents QueryEventsFunc, roomDTag string) (string, error) {
+// roomOwnership junta, para una sala ya existente, tanto el pubkey que la
+// creó originalmente (owner, el autor del primer evento NIP-33 guardado)
+// como el pubkey que figura en el tag "admin" de esa última versión
+// guardada -- ambos quedan habilitados para seguir publicando
+// actualizaciones de sus metadatos.
+type roomOwnership struct {
+	owner string
+	admin string
+}
+
+// findRoomOwnership devuelve el owner y el admin del evento kind:AppDataKind
+// "más nuevo" guardado con tag "d" == roomDTag, o una roomOwnership vacía si
+// todavía no existe ninguno.
+//
+// El reemplazo NIP-33 del backend (ver ReplaceEvent) es por (pubkey, kind,
+// d): compara solo dentro de la propia serie de un mismo autor. Por eso, una
+// vez que se delega la administración a un pubkey distinto del creador
+// original, pueden quedar guardadas legítimamente DOS filas con el mismo "d"
+// -- la última del creador y la última del admin delegado -- cada una en su
+// propia serie. Para decidir cuál manda hay que compararlas por created_at
+// (con el mismo criterio de empate que usa el backend: id mayor gana), no
+// alcanza con tomar "la última iterada" del canal.
+func findRoomOwnership(ctx context.Context, queryEvents QueryEventsFunc, roomDTag string) (roomOwnership, error) {
 	filter := nostr.Filter{
 		Kinds: []int{AppDataKind},
 		Tags:  nostr.TagMap{"d": []string{roomDTag}},
@@ -96,17 +121,30 @@ func findRoomOwner(ctx context.Context, queryEvents QueryEventsFunc, roomDTag st
 
 	ch, err := queryEvents(ctx, filter)
 	if err != nil {
-		return "", err
+		return roomOwnership{}, err
 	}
 
-	owner := ""
+	var newest *nostr.Event
 	for ev := range ch {
 		// el filtro de tags del backend sqlite compara subcadenas del valor
 		// contra cualquier tag, ignorando la clave -- por eso se revalida
 		// aquí que el "d" coincida exactamente.
-		if ev.Tags.GetD() == roomDTag {
-			owner = ev.PubKey
+		if ev.Tags.GetD() != roomDTag {
+			continue
+		}
+		if newest == nil || isNewerRoomEvent(ev, newest) {
+			newest = ev
 		}
 	}
-	return owner, nil
+	if newest == nil {
+		return roomOwnership{}, nil
+	}
+	return roomOwnership{owner: newest.PubKey, admin: newest.Tags.Find("admin").Value()}, nil
+}
+
+// isNewerRoomEvent decide si a manda sobre b, con el mismo criterio de
+// empate que usa eventstore/sqlite3.ReplaceEvent (mayor created_at gana, y
+// en caso de empate el id mayor).
+func isNewerRoomEvent(a, b *nostr.Event) bool {
+	return a.CreatedAt > b.CreatedAt || (a.CreatedAt == b.CreatedAt && a.ID > b.ID)
 }

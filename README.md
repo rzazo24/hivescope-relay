@@ -20,7 +20,7 @@ before storing them.
 |---|---|---|
 | Hive↔Nostr identity link | `30078`, `d=hive-link` | `hive_sig` must be a real signature, made with the **posting** key of the `hive_account`, over the message `hivescope-relay-link:<nostr_pubkey>`. It's verified against the real posting key, queried live from a Hive node. |
 | Chat message | `9` | Requires the `t` tag (room) and that the sender pubkey already has a valid, saved link event. |
-| Room metadata | `30078`, `d=room:<room>` | Requires `name` and an `admin` (valid nostr pubkey), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its sole owner. |
+| Room metadata | `30078`, `d=room:<room>` | Requires `name` and an `admin` (valid nostr pubkey), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its owner; from then on, only that room's current owner or the pubkey named in its `admin` tag may publish further updates (rename, or delegate admin to another account). |
 
 Any event that doesn't match one of these three shapes — any other kind, or
 a `30078` event with a different `d` — is rejected outright. This relay is
