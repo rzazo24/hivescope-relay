@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Firmar vinculación Hive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf8f5;
+    --surface: #ffffff;
+    --border: #e6e1d8;
+    --text: #201d1a;
+    --muted: #6d675e;
+    --accent: #e31337;
+    --accent-ink: #ffffff;
+    --success: #147a4a;
+    --success-bg: #e7f5ee;
+    --error: #b3261e;
+    --error-bg: #fbeceb;
+    --code-bg: #f3efe6;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16151a;
+      --surface: #1f1e24;
+      --border: #322f38;
+      --text: #efece6;
+      --muted: #9d968c;
+      --accent: #ff4d6a;
+      --accent-ink: #16151a;
+      --success: #3ddc84;
+      --success-bg: #103023;
+      --error: #ff8a80;
+      --error-bg: #3a1c1a;
+      --code-bg: #26242c;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', system-ui, sans-serif;
+    padding-inline: 16px;
+    padding-block: 32px;
+    display: flex;
+    justify-content: center;
+  }
+
+  main {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 4px 0 0;
+  }
+
+  p {
+    color: var(--muted);
+    line-height: 1.55;
+    font-size: 14.5px;
+    margin: 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  input[type="text"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .codebox {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    word-break: break-all;
+    color: var(--text);
+  }
+
+  .copybtn {
+    margin-top: 8px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .copybtn:hover { text-decoration: underline; }
+
+  button.primary {
+    appearance: none;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px 18px;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.05s ease;
+  }
+
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:active { transform: scale(0.99); }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .banner {
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .banner.warn { background: var(--error-bg); color: var(--error); }
+  .banner.success { background: var(--success-bg); color: var(--success); }
+
+  .result { display: none; flex-direction: column; gap: 8px; }
+  .result.visible { display: flex; }
+
+  .steps {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+
+  .steps b { color: var(--text); }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <div class="eyebrow">hivescope-relay · hive-link</div>
+    <h1>Firmar vinculación Hive&nbsp;→ Nostr</h1>
+    <p>Esta página no ve ni maneja tu clave privada en ningún momento: la firma la produce <b>Hive Keychain</b>. Acá solo se arma el mensaje exacto que hay que firmar y se muestra el resultado para que lo copies.</p>
+  </div>
+
+  <div id="kc-status" class="banner warn">
+    🔎 Buscando Hive Keychain…
+  </div>
+
+  <div class="card">
+    <div>
+      <label for="account">Cuenta Hive</label>
+      <input type="text" id="account" value="rzazo24" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div>
+      <label for="pubkey">Tu pubkey Nostr (hex, 64 caracteres)</label>
+      <input type="text" id="pubkey" value="507684b4bbe3bc162213702552e6d1183939309deb2910ee6bf28279c6584a39" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div>
+      <label>Mensaje exacto a firmar (se arma solo)</label>
+      <div class="codebox" id="challenge-box"></div>
+    </div>
+
+    <button class="primary" id="sign-btn">Firmar con Hive Keychain</button>
+
+    <div class="result" id="result">
+      <label>Firma (hive_sig) — pegá esto en el chat</label>
+      <div class="codebox" id="sig-box"></div>
+      <button class="copybtn" id="copy-btn">Copiar firma</button>
+    </div>
+
+    <div class="banner warn" id="error-box" hidden></div>
+  </div>
+
+  <div class="card">
+    <label style="margin-bottom: 0;">Qué va a chequear el relé</label>
+    <p style="font-size: 13px;">Va a consultar en vivo la clave <b>posting</b> real de la cuenta en la blockchain de Hive y comprobar que esta firma corresponda a ella. Clave posting real de <code>rzazo24</code> (consultada a api.hive.blog):</p>
+    <div class="codebox" style="font-size: 11.5px;">STM72D8mQcfP1WjxmGcEnfqiw4UoPnEZXMTH8m3eXR4zoP4XVjMit</div>
+  </div>
+
+  <ol class="steps">
+    <li>Revisá que la cuenta y el pubkey de arriba sean los correctos.</li>
+    <li>Apretá <b>"Firmar con Hive Keychain"</b> y aprobá el pedido en la app.</li>
+    <li>Copiá la firma que aparece abajo y pegásela a Claude en el chat.</li>
+  </ol>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function updateChallenge() {
+    const pubkey = $('pubkey').value.trim();
+    $('challenge-box').textContent = 'hivescope-relay-link:' + pubkey;
+  }
+
+  $('pubkey').addEventListener('input', updateChallenge);
+  updateChallenge();
+
+  function watchForKeychain({ intervalMs = 200, timeoutMs = 10000 } = {}) {
+    const start = Date.now();
+    const tick = () => {
+      if (typeof window.hive_keychain !== 'undefined') {
+        $('kc-status').className = 'banner success';
+        $('kc-status').textContent = '✅ Hive Keychain detectado.';
+        return;
+      }
+      if (Date.now() - start >= timeoutMs) {
+        $('kc-status').className = 'banner warn';
+        $('kc-status').textContent = '⚠️ No se detectó Hive Keychain todavía. Probá igual: puede tardar en inyectarse, o recargá la página.';
+        return;
+      }
+      setTimeout(tick, intervalMs);
+    };
+    tick();
+  }
+  watchForKeychain();
+
+  $('sign-btn').addEventListener('click', () => {
+    $('error-box').hidden = true;
+    $('result').classList.remove('visible');
+
+    const account = $('account').value.trim();
+    const pubkey = $('pubkey').value.trim();
+    const challenge = 'hivescope-relay-link:' + pubkey;
+
+    if (!account || !pubkey) {
+      $('error-box').textContent = 'Completá la cuenta y el pubkey antes de firmar.';
+      $('error-box').hidden = false;
+      return;
+    }
+
+    if (typeof window.hive_keychain === 'undefined') {
+      $('error-box').textContent = 'Hive Keychain todavía no respondió en esta página. Esperá unos segundos (o recargá la página) y volvé a intentar.';
+      $('error-box').hidden = false;
+      return;
+    }
+
+    $('sign-btn').disabled = true;
+    $('sign-btn').textContent = 'Esperando a Keychain…';
+
+    window.hive_keychain.requestSignBuffer(account, challenge, 'Posting', (response) => {
+      $('sign-btn').disabled = false;
+      $('sign-btn').textContent = 'Firmar con Hive Keychain';
+
+      if (response && response.success) {
+        $('sig-box').textContent = response.result;
+        $('result').classList.add('visible');
+      } else {
+        $('error-box').textContent = 'Keychain no devolvió una firma: ' + ((response && response.message) || 'pedido cancelado o fallido');
+        $('error-box').hidden = false;
+      }
+    });
+  });
+
+  $('copy-btn').addEventListener('click', async () => {
+    const text = $('sig-box').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      $('copy-btn').textContent = '¡Copiado!';
+      setTimeout(() => { $('copy-btn').textContent = 'Copiar firma'; }, 1500);
+    } catch {
+      const range = document.createRange();
+      range.selectNode($('sig-box'));
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+    }
+  });
+</script>
+</body>
+</html>

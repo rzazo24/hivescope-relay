@@ -1,3 +1,10 @@
 relay.hivescope.xyz {
-	reverse_proxy relay:3334
+	handle_path /tools/* {
+		root * /srv/tools
+		file_server
+	}
+
+	handle {
+		reverse_proxy relay:3334
+	}
 }
