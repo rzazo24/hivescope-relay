@@ -120,6 +120,16 @@ installing extra tools just for that), and `caddy` pings its own admin API
 on `127.0.0.1:2019`. `caddy` won't start until `relay` reports healthy
 (`depends_on: condition: service_healthy`).
 
+This `caddy` container also doubles as the shared HTTPS entry point for the
+whole VPS: since only one process can bind to host port 443, the
+[hivescope-web](https://github.com/rzazo24/hivescope-relay-web) frontend
+(a separate repo, expected to be checked out as a sibling directory,
+`../hivescope-web`) is served from the same Caddy via another site block in
+`Caddyfile`, with its `dist/` build mounted in read-only as another volume.
+The two projects still have fully independent code and deploy steps —
+redeploying the frontend means rebuilding `hivescope-web` and recreating
+just this `caddy` container, not touching `relay` at all.
+
 ### Before bringing it up on a VPS
 
 1. **DNS**: the domain set in `Caddyfile` must resolve (A/AAAA record) to the

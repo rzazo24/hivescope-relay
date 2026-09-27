@@ -8,3 +8,13 @@ relay.hivescope.xyz {
 		reverse_proxy relay:3334
 	}
 }
+
+# Frontend estático de hivescope-web (repo aparte: ~/proyectos/hivescope-web,
+# github.com/rzazo24/hivescope-relay-web). Este Caddy es el único proceso
+# que puede escuchar en :443 en este VPS, así que sirve de entrada compartida
+# para ambos proyectos aunque tengan repos y ciclos de despliegue separados.
+chat.hivescope.xyz {
+	root * /srv/chat
+	try_files {path} /index.html
+	file_server
+}

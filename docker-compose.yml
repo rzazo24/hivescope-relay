@@ -39,6 +39,10 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./web/tools:/srv/tools:ro
+      # Build estático de hivescope-web (repo aparte, ver Caddyfile).
+      # Hay que correr `npm run build` ahí antes de recrear este contenedor
+      # para desplegar una versión nueva.
+      - ../hivescope-web/dist:/srv/chat:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:
