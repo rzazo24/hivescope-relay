@@ -56,6 +56,11 @@ jobs:
           cat "$RUNNER_TEMP/relay.log" >&2
           exit 1
 
+      - name: Check --healthcheck subcommand
+        run: |
+          HIVESCOPE_LISTEN_ADDR=:3334 ./hivescope-relay-ci --healthcheck
+          echo "healthcheck ok"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

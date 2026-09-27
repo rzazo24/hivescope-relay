@@ -113,6 +113,13 @@ enabled to start on boot, so a VPS reboot brings everything back up on its
 own — as long as `docker.service` is enabled (`systemctl is-enabled
 docker`) and the containers weren't manually stopped beforehand.
 
+Both also have a Docker `HEALTHCHECK`: `relay` runs itself with
+`--healthcheck` (a tiny built-in mode that just GETs its own NIP-11
+endpoint — the final image is debian-slim with no curl/wget, so this avoids
+installing extra tools just for that), and `caddy` pings its own admin API
+on `127.0.0.1:2019`. `caddy` won't start until `relay` reports healthy
+(`depends_on: condition: service_healthy`).
+
 ### Before bringing it up on a VPS
 
 1. **DNS**: the domain set in `Caddyfile` must resolve (A/AAAA record) to the

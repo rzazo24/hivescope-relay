@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,11 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--healthcheck" {
+		runHealthcheck()
+		return
+	}
+
 	dbPath := getenv("HIVESCOPE_DB_PATH", "./data/hivescope-relay.sqlite")
 	hiveNode := getenv("HIVESCOPE_HIVE_NODE", hiveapi.DefaultNode)
 	addr := getenv("HIVESCOPE_LISTEN_ADDR", ":3334")
@@ -76,4 +82,39 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// runHealthcheck se usa como HEALTHCHECK de Docker (ver docker-compose.yml):
+// se invoca como `hivescope-relay --healthcheck` dentro del propio
+// contenedor. La imagen final es debian-slim sin curl ni wget, así que en
+// vez de instalar herramientas solo para esto, el propio binario se
+// autochequea pegándole al endpoint NIP-11 de su propia instancia.
+func runHealthcheck() {
+	addr := getenv("HIVESCOPE_LISTEN_ADDR", ":3334")
+
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "healthcheck: HIVESCOPE_LISTEN_ADDR inválido (%q): %v\n", addr, err)
+		os.Exit(1)
+	}
+
+	client := http.Client{Timeout: 3 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+port+"/", nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "healthcheck: %v\n", err)
+		os.Exit(1)
+	}
+	req.Header.Set("Accept", "application/nostr+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "healthcheck: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "healthcheck: status %d\n", resp.StatusCode)
+		os.Exit(1)
+	}
 }

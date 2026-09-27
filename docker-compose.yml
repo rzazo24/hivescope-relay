@@ -18,6 +18,12 @@ services:
       - relay-data:/app/data
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "/app/hivescope-relay", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
   caddy:
     image: caddy:2-alpine
@@ -25,7 +31,8 @@ services:
     restart: unless-stopped
     logging: *default-logging
     depends_on:
-      - relay
+      relay:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
@@ -36,6 +43,12 @@ services:
       - caddy-config:/config
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
 networks:
   internal:

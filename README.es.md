@@ -116,6 +116,13 @@ levanta todo solo — siempre que `docker.service` esté habilitado
 (`systemctl is-enabled docker`) y los contenedores no se hayan parado a mano
 antes.
 
+Los dos tienen también un `HEALTHCHECK` de Docker: `relay` se ejecuta a sí
+mismo con `--healthcheck` (un modo mínimo que solo hace un GET a su propio
+endpoint NIP-11 — la imagen final es debian-slim sin curl/wget, así que esto
+evita instalar herramientas extra solo para esto), y `caddy` hace ping a su
+propia API de administración en `127.0.0.1:2019`. `caddy` no arranca hasta
+que `relay` reporta estar sano (`depends_on: condition: service_healthy`).
+
 ### Antes de levantarlo en un VPS
 
 1. **DNS**: el dominio que pusiste en `Caddyfile` tiene que resolver (registro
