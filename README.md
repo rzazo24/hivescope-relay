@@ -1,141 +1,142 @@
 # hivescope-relay
 
-Relé [Nostr](https://nostr.com/) self-hosted, escrito en Go con
-[khatru](https://github.com/fiatjaf/khatru), pensado como backend de tiempo
-real para un chat descentralizado vinculado a cuentas de
-[Hive](https://hive.io/) (blockchain).
+*[Leer en español](README.es.md)*
 
-A diferencia de un relé "de fábrica" (strfry, nostr-rs-relay, etc.), este
-relé tiene lógica de validación propia: solo acepta los tres tipos de evento
-que necesita el chat de HiveScope, y los valida contra la blockchain de Hive
-antes de guardarlos.
+Self-hosted [Nostr](https://nostr.com/) relay written in Go with
+[khatru](https://github.com/fiatjaf/khatru), built as the real-time backend
+for a decentralized chat linked to [Hive](https://hive.io/) (blockchain)
+accounts.
 
-## Qué valida
+Unlike an off-the-shelf relay (strfry, nostr-rs-relay, etc.), this relay has
+its own validation logic: it only accepts the three event types the
+HiveScope chat needs, and validates each of them against the Hive blockchain
+before storing them.
 
-| Evento | kind | Regla |
+## What it validates
+
+| Event | kind | Rule |
 |---|---|---|
-| Vinculación de identidad Hive↔Nostr | `30078`, `d=hive-link` | El `hive_sig` debe ser una firma real, hecha con la clave **posting** de la cuenta `hive_account`, sobre el mensaje `hivescope-relay-link:<pubkey_nostr>`. Se verifica contra la clave posting real, consultada en vivo a un nodo Hive. |
-| Mensaje de chat | `9` | Requiere el tag `t` (sala) y que el pubkey emisor tenga ya un evento de vinculación válido guardado. |
-| Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name` y un `admin` (pubkey nostr válido), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su única dueña. |
+| Hive↔Nostr identity link | `30078`, `d=hive-link` | `hive_sig` must be a real signature, made with the **posting** key of the `hive_account`, over the message `hivescope-relay-link:<nostr_pubkey>`. It's verified against the real posting key, queried live from a Hive node. |
+| Chat message | `9` | Requires the `t` tag (room) and that the sender pubkey already has a valid, saved link event. |
+| Room metadata | `30078`, `d=room:<room>` | Requires `name` and an `admin` (valid nostr pubkey), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its sole owner. |
 
-El detalle de cada regla está documentado como comentario en el archivo de
-la política correspondiente, en `internal/policies/`.
+Each rule is documented as a comment in its corresponding policy file, under
+`internal/policies/`.
 
-## Estructura del proyecto
+## Project structure
 
 ```
-main.go                          arranca khatru + sqlite + registra las políticas
-internal/hiveapi/                cliente JSON-RPC contra la API pública de Hive
-internal/hivecrypto/             verificación de firmas Hive (secp256k1 recuperable)
-internal/policies/               las tres políticas de validación (RejectEvent de khatru)
-test/test-relay.mjs              prueba de humo en Node (nostr-tools) contra un relé real
-Dockerfile, docker-compose.yml   build e infraestructura para desplegar
-Caddyfile                        reverse proxy con TLS automático (Let's Encrypt)
+main.go                          wires up khatru + sqlite and registers the policies
+internal/hiveapi/                JSON-RPC client against the public Hive API
+internal/hivecrypto/              Hive signature verification (recoverable secp256k1)
+internal/policies/               the three validation policies (khatru RejectEvent)
+test/test-relay.mjs              Node (nostr-tools) smoke test against a real relay
+Dockerfile, docker-compose.yml   build and infrastructure for deployment
+Caddyfile                        reverse proxy with automatic TLS (Let's Encrypt)
 ```
 
-## Correr en local (sin Docker)
+## Running locally (without Docker)
 
-Requiere Go 1.27+ y un compilador de C (el driver de SQLite usa cgo).
+Requires Go 1.27+ and a C compiler (the SQLite driver uses cgo).
 
 ```bash
 go run .
 ```
 
-Por defecto escucha en `:3334`, guarda la base en
-`./data/hivescope-relay.sqlite` y consulta `https://api.hive.blog`. Se puede
-cambiar con variables de entorno:
+By default it listens on `:3334`, stores its database at
+`./data/hivescope-relay.sqlite`, and queries `https://api.hive.blog`. This
+can be changed with environment variables:
 
-| Variable | Default | Qué hace |
+| Variable | Default | What it does |
 |---|---|---|
-| `HIVESCOPE_LISTEN_ADDR` | `:3334` | dirección/puerto donde escucha el relé |
-| `HIVESCOPE_DB_PATH` | `./data/hivescope-relay.sqlite` | ruta del archivo SQLite |
-| `HIVESCOPE_HIVE_NODE` | `https://api.hive.blog` | nodo Hive contra el que se verifican las cuentas |
+| `HIVESCOPE_LISTEN_ADDR` | `:3334` | address/port the relay listens on |
+| `HIVESCOPE_DB_PATH` | `./data/hivescope-relay.sqlite` | path to the SQLite file |
+| `HIVESCOPE_HIVE_NODE` | `https://api.hive.blog` | Hive node used to verify accounts against |
 
-## Correr los tests
+## Running the tests
 
 ```bash
-# tests unitarios de Go (verificación de firmas y políticas)
+# Go unit tests (signature verification and policies)
 go test ./...
 
-# prueba de humo de extremo a extremo (necesita un relé corriendo)
+# end-to-end smoke test (needs a relay running)
 cd test
 npm install
 RELAY_URL=ws://localhost:3334 npm test
 ```
 
-El script de Node genera dos pares de claves de prueba y confirma que el
-relé rechaza: (1) un evento de vinculación con firma hive inválida, y (2) un
-mensaje de chat de un pubkey que nunca se vinculó.
+The Node script generates two test keypairs and confirms the relay rejects:
+(1) a link event with an invalid hive signature, and (2) a chat message from
+a pubkey that never linked an account.
 
-## Desplegar con Docker
+## Deploying with Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-Esto levanta dos contenedores:
-- `relay`: el binario de Go + SQLite. **No publica ningún puerto al host** —
-  solo es alcanzable desde `caddy`, dentro de la red interna de Docker.
-- `caddy`: reverse proxy que expone `80`/`443` al exterior y obtiene
-  automáticamente un certificado TLS de Let's Encrypt para el dominio
-  configurado en `Caddyfile` (por defecto `relay.hivescope.xyz` — cambialo
-  ahí si usás otro dominio).
+This brings up two containers:
+- `relay`: the Go binary + SQLite. **Publishes no port to the host** — it's
+  only reachable from `caddy`, inside Docker's internal network.
+- `caddy`: reverse proxy that exposes `80`/`443` externally and automatically
+  obtains a Let's Encrypt TLS certificate for the domain configured in
+  `Caddyfile` (`relay.hivescope.xyz` by default — change it there if you use
+  a different domain).
 
-Los datos de SQLite y los certificados de Caddy quedan en volúmenes con
-nombre (`relay-data`, `caddy-data`, `caddy-config`), así que sobreviven a un
-`docker compose down` (sin `-v`).
+SQLite data and Caddy's certificates live in named volumes (`relay-data`,
+`caddy-data`, `caddy-config`), so they survive a `docker compose down`
+(without `-v`).
 
-### Antes de levantarlo en un VPS
+### Before bringing it up on a VPS
 
-1. **DNS**: el dominio que pusiste en `Caddyfile` tiene que resolver (registro
-   A/AAAA) a la IP pública del VPS *antes* de levantar Caddy — si no, Let's
-   Encrypt no va a poder validar el dominio.
-2. **Firewall del VPS** (a nivel de sistema operativo): abrir `tcp/80` y
-   `tcp/443`. En Ubuntu con iptables (sin ufw), algo así, insertando antes de
-   cualquier regla de `REJECT`/`DROP` general:
+1. **DNS**: the domain set in `Caddyfile` must resolve (A/AAAA record) to the
+   VPS's public IP *before* Caddy starts — otherwise Let's Encrypt won't be
+   able to validate the domain.
+2. **VPS firewall** (at the OS level): open `tcp/80` and `tcp/443`. On Ubuntu
+   with iptables (no ufw), something like this, inserted before any general
+   `REJECT`/`DROP` rule:
    ```bash
-   sudo iptables -I INPUT <linea> -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
-   sudo iptables -I INPUT <linea> -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
-   sudo netfilter-persistent save   # para que sobreviva un reboot
+   sudo iptables -I INPUT <line> -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
+   sudo iptables -I INPUT <line> -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
+   sudo netfilter-persistent save   # so it survives a reboot
    ```
-3. **Firewall de la nube** (si es Oracle Cloud): además del firewall del
-   sistema operativo, hay un firewall aparte a nivel de red —el **Security
-   List** (o **Network Security Group**) de la VCN— que por defecto no deja
-   pasar nada salvo SSH. Sin abrir ahí `tcp/80` y `tcp/443` (Source
-   `0.0.0.0/0`), Let's Encrypt nunca va a poder completar la verificación,
-   aunque el firewall del sistema operativo ya esté abierto: consola de OCI
-   → tu instancia → *Attached VNICs* → el VNIC → *Subnet* → *Security Lists*
-   → la lista por defecto → *Add Ingress Rules*.
-4. Recién ahí: `docker compose up -d --build`. Podés seguir el progreso del
-   certificado con `docker compose logs -f caddy` — si el DNS y los dos
-   firewalls están bien, en general se resuelve en segundos.
+3. **Cloud firewall** (if it's Oracle Cloud): besides the OS firewall,
+   there's a separate network-level firewall — the VCN's **Security List**
+   (or **Network Security Group**) — which by default only allows SSH
+   through. Without opening `tcp/80` and `tcp/443` there (source
+   `0.0.0.0/0`), Let's Encrypt will never be able to complete validation,
+   even if the OS firewall is already open: OCI console → your instance →
+   *Attached VNICs* → the VNIC → *Subnet* → *Security Lists* → the default
+   list → *Add Ingress Rules*.
+4. Only then: `docker compose up -d --build`. You can follow the
+   certificate's progress with `docker compose logs -f caddy` — if DNS and
+   both firewalls are set up correctly, it usually resolves within seconds.
 
-## Vincular una cuenta Hive (para el frontend)
+## Linking a Hive account (for the frontend)
 
-Un cliente tiene que publicar un evento `kind:30078` así:
+A client needs to publish a `kind:30078` event like this:
 
 ```json
 {
   "kind": 30078,
   "tags": [
     ["d", "hive-link"],
-    ["hive_account", "<usuario_hive>"],
-    ["hive_sig", "<firma_hex>"],
+    ["hive_account", "<hive_username>"],
+    ["hive_sig", "<hex_signature>"],
     ["hive_key_type", "posting"]
   ],
   "content": ""
 }
 ```
 
-Donde `hive_sig` es el resultado de firmar, **con la clave posting de esa
-cuenta** (por ejemplo con `hive_keychain.requestSignBuffer`), exactamente el
-string:
+Where `hive_sig` is the result of signing, **with that account's posting
+key** (e.g. via `hive_keychain.requestSignBuffer`), exactly the string:
 
 ```
-hivescope-relay-link:<pubkey_nostr_del_evento>
+hivescope-relay-link:<nostr_pubkey_of_the_event>
 ```
 
-(el pubkey del propio evento que se está publicando, en hex). Ver
-`internal/policies/hivelink.go` (función `LinkChallenge`) para el detalle
-exacto — es un contrato entre el frontend y el relé, no se puede cambiar de
-un lado sin el otro.
+(the pubkey of the event being published itself, in hex). See
+`internal/policies/hivelink.go` (the `LinkChallenge` function) for the exact
+details — it's a contract between the frontend and the relay, and can't be
+changed on one side without the other.
