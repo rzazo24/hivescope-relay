@@ -22,10 +22,20 @@ import (
 // política deja pasar esas tres formas sin opinar (para no contradecirlas) y
 // solo actúa de red de seguridad para todo lo demás. El orden en que se
 // registre respecto a las otras no importa.
+//
+// kind:5 (NIP-09, borrado) también se deja pasar sin opinar. khatru maneja
+// los eventos de borrado con su propia lógica (handleDeleteRequest, que
+// verifica que el pubkey coincida con el autor del evento a borrar) *antes*
+// de tratarlos como un evento "normal" -- pero igual los hace pasar después
+// por handleNormal (y por lo tanto por este RejectEvent) porque kind:5 no
+// es un kind efímero. Si esta política lo rechazara, el borrado ya
+// aplicado igual se reportaría como fallido al cliente (falso rechazo):
+// se comprobó en la práctica que el evento se borraba de la base a pesar
+// del "OK false" devuelto.
 func NewAllowedEventsPolicy() func(ctx context.Context, event *nostr.Event) (bool, string) {
 	return func(ctx context.Context, event *nostr.Event) (bool, string) {
 		switch event.Kind {
-		case ChatMessageKind:
+		case ChatMessageKind, nostr.KindDeletion:
 			return false, ""
 		case AppDataKind:
 			d := event.Tags.GetD()

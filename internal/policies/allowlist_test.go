@@ -50,10 +50,23 @@ func TestAllowedEventsPolicy_RejectsUnknownAppDataTag(t *testing.T) {
 
 func TestAllowedEventsPolicy_RejectsOtherKinds(t *testing.T) {
 	policy := NewAllowedEventsPolicy()
-	for _, kind := range []int{0, 1, 3, 4, 5, 7, 20000} {
+	for _, kind := range []int{0, 1, 3, 4, 7, 20000} {
 		reject, msg := policy(context.Background(), &nostr.Event{Kind: kind})
 		if !reject || msg == "" {
 			t.Fatalf("debería rechazar eventos de kind %d", kind)
 		}
+	}
+}
+
+func TestAllowedEventsPolicy_AllowsDeletionRequests(t *testing.T) {
+	// kind:5 (NIP-09) no debe rechazarse: khatru ya lo autoriza con su
+	// propia lógica (handleDeleteRequest) antes de pasar por esta política,
+	// y como no es un kind efímero también pasa por handleNormal/RejectEvent
+	// después -- si lo rechazáramos acá, un borrado que ya se aplicó de
+	// verdad se reportaría como fallido al cliente.
+	policy := NewAllowedEventsPolicy()
+	reject, _ := policy(context.Background(), &nostr.Event{Kind: nostr.KindDeletion})
+	if reject {
+		t.Fatal("no debería rechazar eventos kind 5 (borrado NIP-09)")
 	}
 }

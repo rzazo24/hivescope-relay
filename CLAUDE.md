@@ -75,7 +75,16 @@ is load-bearing, not incidental:
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay
-   registered.
+   registered. It explicitly lets `kind:5` (NIP-09 deletion) through
+   untouched — khatru authorizes deletions with its own separate logic
+   (`handleDeleteRequest`, pubkey-matching) *before* this chain runs, but
+   since kind:5 isn't an ephemeral kind it *also* gets passed through
+   `handleNormal`/`RejectEvent` afterward. If this policy rejected kind:5,
+   the deletion would still actually happen but the client would receive a
+   false `OK:false` — confirmed in practice while building the frontend
+   (the room got deleted from storage despite the relay reporting
+   rejection). Don't reintroduce that by narrowing the switch back down to
+   just `ChatMessageKind`.
 
 `kinds.go` holds `AppDataKind` (`30078`), shared by both `hive-link` and
 `room:*` since they're the same NIP-78 kind distinguished only by their `d`
