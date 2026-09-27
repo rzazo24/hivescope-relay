@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ver sala de chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf8f5;
+    --surface: #ffffff;
+    --border: #e6e1d8;
+    --text: #201d1a;
+    --muted: #6d675e;
+    --accent: #e31337;
+    --accent-ink: #ffffff;
+    --success: #147a4a;
+    --success-bg: #e7f5ee;
+    --error: #b3261e;
+    --error-bg: #fbeceb;
+    --code-bg: #f3efe6;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16151a;
+      --surface: #1f1e24;
+      --border: #322f38;
+      --text: #efece6;
+      --muted: #9d968c;
+      --accent: #ff4d6a;
+      --accent-ink: #16151a;
+      --success: #3ddc84;
+      --success-bg: #103023;
+      --error: #ff8a80;
+      --error-bg: #3a1c1a;
+      --code-bg: #26242c;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', system-ui, sans-serif;
+    padding-inline: 16px;
+    padding-block: 32px;
+    display: flex;
+    justify-content: center;
+  }
+
+  main {
+    width: 100%;
+    max-width: 620px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 4px 0 0;
+  }
+
+  p { color: var(--muted); line-height: 1.55; font-size: 14.5px; margin: 0; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  label { font-size: 12.5px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 6px; }
+
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  button.primary {
+    appearance: none;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 11px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  button.primary:hover { filter: brightness(1.08); }
+
+  .status {
+    font-size: 12.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.ok .dot { background: var(--success); }
+  .status.err .dot { background: var(--error); }
+  .status.ok { color: var(--success); }
+  .status.err { color: var(--error); }
+
+  .room-meta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .room-meta b { color: var(--text); }
+
+  .messages {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .msg {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--code-bg);
+  }
+
+  .msg-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .msg-content {
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13.5px;
+    padding: 24px 0;
+  }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <div class="eyebrow">hivescope-relay · visor de solo lectura</div>
+    <h1>Ver una sala de chat</h1>
+    <p>Esto no es el frontend final del chat — es una ventana mínima para confirmar qué hay guardado de verdad en el relé. Se conecta en vivo por WebSocket a <code id="relay-host" style="font-family:'JetBrains Mono',monospace;"></code>.</p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="room">Nombre de sala (tag "t")</label>
+        <input type="text" id="room" value="sala-rzazo24-test" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="primary" id="load-btn">Ver sala</button>
+    </div>
+    <div class="status" id="status"><span class="dot"></span><span id="status-text">Sin conectar</span></div>
+    <div class="room-meta" id="room-meta" hidden></div>
+  </div>
+
+  <div class="card">
+    <label style="margin-bottom: 0;">Mensajes</label>
+    <div class="messages" id="messages">
+      <div class="empty">Elegí una sala y apretá "Ver sala".</div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const relayUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
+  $('relay-host').textContent = relayUrl;
+
+  let ws = null;
+  let subId = null;
+  const messagesById = new Map();
+
+  function setStatus(kind, text) {
+    const el = $('status');
+    el.className = 'status' + (kind ? ' ' + kind : '');
+    $('status-text').textContent = text;
+  }
+
+  function shortPubkey(pk) {
+    return pk.slice(0, 8) + '…' + pk.slice(-4);
+  }
+
+  function fmtTime(unixSeconds) {
+    return new Date(unixSeconds * 1000).toLocaleString();
+  }
+
+  function renderMessages() {
+    const list = [...messagesById.values()].sort((a, b) => a.created_at - b.created_at);
+    const container = $('messages');
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty">Todavía no hay mensajes en esta sala.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const ev of list) {
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.innerHTML =
+        '<div class="msg-head"><span>' + shortPubkey(ev.pubkey) + '</span><span>' + fmtTime(ev.created_at) + '</span></div>' +
+        '<div class="msg-content"></div>';
+      div.querySelector('.msg-content').textContent = ev.content;
+      container.appendChild(div);
+    }
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function renderRoomMeta(ev) {
+    const name = (ev.tags.find(t => t[0] === 'name') || [])[1] || '(sin nombre)';
+    const admin = (ev.tags.find(t => t[0] === 'admin') || [])[1] || '(sin admin)';
+    $('room-meta').hidden = false;
+    $('room-meta').innerHTML = '<b>' + name + '</b> · admin: <span style="font-family:\'JetBrains Mono\',monospace;">' + shortPubkey(admin) + '</span>';
+  }
+
+  $('load-btn').addEventListener('click', () => {
+    const room = $('room').value.trim();
+    if (!room) return;
+
+    messagesById.clear();
+    renderMessages();
+    $('room-meta').hidden = true;
+    $('messages').innerHTML = '<div class="empty">Cargando…</div>';
+
+    if (ws) ws.close();
+    setStatus(null, 'Conectando…');
+
+    ws = new WebSocket(relayUrl);
+    subId = 'room-viewer-' + Math.random().toString(36).slice(2, 8);
+
+    ws.addEventListener('open', () => {
+      setStatus('ok', 'Conectado, escuchando "' + room + '"');
+      ws.send(JSON.stringify(['REQ', subId, { kinds: [9], '#t': [room], limit: 100 }]));
+      ws.send(JSON.stringify(['REQ', subId + '-meta', { kinds: [30078], '#d': ['room:' + room], limit: 5 }]));
+    });
+
+    ws.addEventListener('message', (raw) => {
+      let data;
+      try { data = JSON.parse(raw.data); } catch { return; }
+      const [type, id, payload] = data;
+
+      if (type === 'EVENT') {
+        if (id === subId) {
+          messagesById.set(payload.id, payload);
+          renderMessages();
+        } else if (id === subId + '-meta' && payload.tags.some(t => t[0] === 'd' && t[1] === 'room:' + room)) {
+          renderRoomMeta(payload);
+        }
+      } else if (type === 'EOSE') {
+        if (messagesById.size === 0) {
+          $('messages').innerHTML = '<div class="empty">Todavía no hay mensajes en esta sala.</div>';
+        }
+      } else if (type === 'NOTICE') {
+        setStatus('err', 'Aviso del relé: ' + payload);
+      }
+    });
+
+    ws.addEventListener('close', () => setStatus(null, 'Desconectado'));
+    ws.addEventListener('error', () => setStatus('err', 'Error de conexión'));
+  });
+
+  $('load-btn').click();
+</script>
+</body>
+</html>
