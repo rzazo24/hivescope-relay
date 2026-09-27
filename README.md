@@ -27,9 +27,17 @@ a `30078` event with a different `d` — is rejected outright. This relay is
 not meant to be a general-purpose Nostr relay; it exists only to back the
 HiveScope chat.
 
-A couple of things this relay does **not** restrict, worth keeping in mind:
-reading (subscribing via `REQ`) is open to anyone, with no per-room privacy;
-and there's no rate limiting on connections or event publishing.
+It's also rate-limited per IP, using khatru's built-in
+[`policies`](https://github.com/fiatjaf/khatru/tree/master/policies)
+package: new connections, published events, and `REQ` filters each have
+their own limit (see the `khatrupolicies.*RateLimiter` calls in `main.go`
+for the exact numbers). The event limiter runs *first*, before any of the
+three policies above — so a flood of fake `hive-link` attempts gets stopped
+before it can trigger a live call to the Hive API for each one.
+
+One thing this relay does **not** restrict, worth keeping in mind: reading
+(subscribing via `REQ`) has no access control — anyone can query anything
+that's stored, with no per-room privacy.
 
 Each rule is documented as a comment in its corresponding policy file, under
 `internal/policies/`.

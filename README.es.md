@@ -27,10 +27,18 @@ kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
 relé no está pensado como un relé Nostr de propósito general: existe solo
 para dar soporte al chat de HiveScope.
 
-Un par de cosas que este relé **no** restringe, para tenerlas en cuenta: leer
-(suscribirse vía `REQ`) está abierto a cualquiera, sin privacidad por sala; y
-no hay límite de velocidad (rate limiting) en conexiones ni en publicación
-de eventos.
+Además tiene límite de velocidad (rate limiting) por IP, usando el paquete
+[`policies`](https://github.com/fiatjaf/khatru/tree/master/policies) que ya
+trae khatru: las conexiones nuevas, los eventos publicados y los filtros
+`REQ` tienen cada uno su propio límite (los números exactos están en las
+llamadas `khatrupolicies.*RateLimiter` de `main.go`). El límite de eventos
+corre *primero*, antes que las tres políticas de arriba — así, una oleada de
+intentos falsos de `hive-link` se frena antes de disparar una llamada real
+a la API de Hive por cada uno.
+
+Una cosa que este relé **no** restringe, para tenerla en cuenta: leer
+(suscribirse vía `REQ`) no tiene ningún control de acceso — cualquiera puede
+consultar todo lo que hay guardado, sin privacidad por sala.
 
 El detalle de cada regla está documentado como comentario en el archivo de
 la política correspondiente, en `internal/policies/`.
