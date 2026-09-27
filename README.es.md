@@ -105,7 +105,16 @@ Esto levanta dos contenedores:
 
 Los datos de SQLite y los certificados de Caddy quedan en volúmenes con
 nombre (`relay-data`, `caddy-data`, `caddy-config`), así que sobreviven a un
-`docker compose down` (sin `-v`).
+`docker compose down` (sin `-v`). Los dos servicios también tienen limitado
+el tamaño de sus logs de Docker a 10 MB × 3 archivos (driver `json-file`,
+configurado en `docker-compose.yml`) — por defecto no tiene límite, y eso
+iría llenando el disco de a poco con el tiempo.
+
+Los dos contenedores tienen `restart: unless-stopped`, y el propio Docker
+está habilitado para arrancar con el sistema, así que un reinicio del VPS
+levanta todo solo — siempre que `docker.service` esté habilitado
+(`systemctl is-enabled docker`) y los contenedores no se hayan parado a mano
+antes.
 
 ### Antes de levantarlo en un VPS
 

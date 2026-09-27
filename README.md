@@ -104,7 +104,14 @@ This brings up two containers:
 
 SQLite data and Caddy's certificates live in named volumes (`relay-data`,
 `caddy-data`, `caddy-config`), so they survive a `docker compose down`
-(without `-v`).
+(without `-v`). Both services also cap their Docker logs at 10 MB × 3 files
+(`json-file` driver, set in `docker-compose.yml`) — the default is
+unbounded, which would otherwise slowly fill up the disk over time.
+
+Both containers are set to `restart: unless-stopped`, and Docker itself is
+enabled to start on boot, so a VPS reboot brings everything back up on its
+own — as long as `docker.service` is enabled (`systemctl is-enabled
+docker`) and the containers weren't manually stopped beforehand.
 
 ### Before bringing it up on a VPS
 

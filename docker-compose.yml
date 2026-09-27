@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   relay:
     build: .
     container_name: hivescope-relay
     restart: unless-stopped
+    logging: *default-logging
     environment:
       HIVESCOPE_DB_PATH: /app/data/hivescope-relay.sqlite
       HIVESCOPE_LISTEN_ADDR: ":3334"
@@ -16,6 +23,7 @@ services:
     image: caddy:2-alpine
     container_name: hivescope-caddy
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - relay
     ports:
