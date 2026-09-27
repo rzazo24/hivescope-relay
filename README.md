@@ -190,3 +190,7 @@ hivescope-relay-link:<nostr_pubkey_of_the_event>
 `internal/policies/hivelink.go` (the `LinkChallenge` function) for the exact
 details — it's a contract between the frontend and the relay, and can't be
 changed on one side without the other.
+
+## License
+
+[MIT](LICENSE)

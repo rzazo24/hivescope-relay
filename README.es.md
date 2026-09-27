@@ -193,3 +193,7 @@ hivescope-relay-link:<pubkey_nostr_del_evento>
 `internal/policies/hivelink.go` (función `LinkChallenge`) para el detalle
 exacto — es un contrato entre el frontend y el relé, no se puede cambiar de
 un lado sin el otro.
+
+## Licencia
+
+[MIT](LICENSE)
