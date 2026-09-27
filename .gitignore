@@ -1,0 +1,14 @@
+# Go
+/hivescope-relay
+*.exe
+*.test
+*.out
+
+# Base de datos local del relé (SQLite)
+/data/
+
+# Node (para el script de test que añadiremos más adelante)
+node_modules/
+
+# Entornos / secretos
+.env
