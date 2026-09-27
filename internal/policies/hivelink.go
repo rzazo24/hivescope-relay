@@ -12,9 +12,9 @@ import (
 	"github.com/rzazo24/hivescope-relay/internal/hivecrypto"
 )
 
-// HiveLinkKind es el kind (parametrizado reemplazable, NIP-33) usado para
-// vincular una cuenta Hive con un pubkey Nostr.
-const HiveLinkKind = 30078
+// HiveLinkKind es el kind usado para vincular una cuenta Hive con un pubkey
+// Nostr. Ver AppDataKind.
+const HiveLinkKind = AppDataKind
 
 // HiveLinkDTag es el valor del tag "d" que identifica a un evento de
 // vinculación Hive<->Nostr dentro del kind 30078 (que también se usa, con

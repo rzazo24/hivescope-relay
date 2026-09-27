@@ -45,6 +45,7 @@ func main() {
 	relay.RejectEvent = append(relay.RejectEvent,
 		policies.NewHiveLinkPolicy(hiveClient),
 		policies.NewChatMessagePolicy(db.QueryEvents),
+		policies.NewRoomMetaPolicy(db.QueryEvents),
 	)
 
 	fmt.Printf("hivescope-relay escuchando en %s (nodo hive: %s, db: %s)\n", addr, hiveNode, dbPath)
