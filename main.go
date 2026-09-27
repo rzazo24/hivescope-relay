@@ -46,6 +46,7 @@ func main() {
 		policies.NewHiveLinkPolicy(hiveClient),
 		policies.NewChatMessagePolicy(db.QueryEvents),
 		policies.NewRoomMetaPolicy(db.QueryEvents),
+		policies.NewAllowedEventsPolicy(),
 	)
 
 	fmt.Printf("hivescope-relay escuchando en %s (nodo hive: %s, db: %s)\n", addr, hiveNode, dbPath)

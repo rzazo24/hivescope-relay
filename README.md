@@ -22,6 +22,15 @@ before storing them.
 | Chat message | `9` | Requires the `t` tag (room) and that the sender pubkey already has a valid, saved link event. |
 | Room metadata | `30078`, `d=room:<room>` | Requires `name` and an `admin` (valid nostr pubkey), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its sole owner. |
 
+Any event that doesn't match one of these three shapes — any other kind, or
+a `30078` event with a different `d` — is rejected outright. This relay is
+not meant to be a general-purpose Nostr relay; it exists only to back the
+HiveScope chat.
+
+A couple of things this relay does **not** restrict, worth keeping in mind:
+reading (subscribing via `REQ`) is open to anyone, with no per-room privacy;
+and there's no rate limiting on connections or event publishing.
+
 Each rule is documented as a comment in its corresponding policy file, under
 `internal/policies/`.
 

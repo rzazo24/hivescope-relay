@@ -22,6 +22,16 @@ antes de guardarlos.
 | Mensaje de chat | `9` | Requiere el tag `t` (sala) y que el pubkey emisor tenga ya un evento de vinculación válido guardado. |
 | Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name` y un `admin` (pubkey nostr válido), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su única dueña. |
 
+Cualquier evento que no encaje en una de estas tres formas —cualquier otro
+kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
+relé no está pensado como un relé Nostr de propósito general: existe solo
+para dar soporte al chat de HiveScope.
+
+Un par de cosas que este relé **no** restringe, para tenerlas en cuenta: leer
+(suscribirse vía `REQ`) está abierto a cualquiera, sin privacidad por sala; y
+no hay límite de velocidad (rate limiting) en conexiones ni en publicación
+de eventos.
+
 El detalle de cada regla está documentado como comentario en el archivo de
 la política correspondiente, en `internal/policies/`.
 
