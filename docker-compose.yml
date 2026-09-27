@@ -14,6 +14,9 @@ services:
       HIVESCOPE_DB_PATH: /app/data/hivescope-relay.sqlite
       HIVESCOPE_LISTEN_ADDR: ":3334"
       HIVESCOPE_HIVE_NODE: https://api.hive.blog
+      # Puede renombrar/editar cualquier sala, no solo las que crea o
+      # administra -- ver NewRoomMetaPolicy en internal/policies/roommeta.go.
+      HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT: rzazo24
     volumes:
       - relay-data:/app/data
     networks:

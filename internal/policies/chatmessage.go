@@ -57,13 +57,25 @@ func NewChatMessagePolicy(queryEvents QueryEventsFunc) func(ctx context.Context,
 
 // hasVerifiedHiveLink busca, entre los eventos ya guardados por el relé, un
 // evento kind:30078 d=hive-link publicado por pubkey.
+func hasVerifiedHiveLink(ctx context.Context, queryEvents QueryEventsFunc, pubkey string) (bool, error) {
+	account, err := findLinkedHiveAccount(ctx, queryEvents, pubkey)
+	if err != nil {
+		return false, err
+	}
+	return account != "", nil
+}
+
+// findLinkedHiveAccount busca, entre los eventos ya guardados por el relé, un
+// evento kind:30078 d=hive-link publicado por pubkey, y devuelve el valor de
+// su tag "hive_account" (o "" si pubkey no tiene ninguna vinculación
+// guardada).
 //
 // Se drena el canal por completo aunque ya se haya encontrado una
 // coincidencia: el backend sqlite3 sigue escribiendo en el canal hasta que se
 // lee todo o se cancela el contexto, así que cortar la iteración a mitad de
 // camino dejaría una goroutine bloqueada (y una fila abierta en la base de
 // datos) hasta que se cierre la conexión websocket.
-func hasVerifiedHiveLink(ctx context.Context, queryEvents QueryEventsFunc, pubkey string) (bool, error) {
+func findLinkedHiveAccount(ctx context.Context, queryEvents QueryEventsFunc, pubkey string) (string, error) {
 	filter := nostr.Filter{
 		Kinds:   []int{HiveLinkKind},
 		Authors: []string{pubkey},
@@ -71,14 +83,14 @@ func hasVerifiedHiveLink(ctx context.Context, queryEvents QueryEventsFunc, pubke
 
 	ch, err := queryEvents(ctx, filter)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 
-	found := false
+	account := ""
 	for ev := range ch {
 		if ev.Tags.GetD() == HiveLinkDTag {
-			found = true
+			account = ev.Tags.Find("hive_account").Value()
 		}
 	}
-	return found, nil
+	return account, nil
 }

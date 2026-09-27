@@ -71,6 +71,7 @@ can be changed with environment variables:
 | `HIVESCOPE_LISTEN_ADDR` | `:3334` | address/port the relay listens on |
 | `HIVESCOPE_DB_PATH` | `./data/hivescope-relay.sqlite` | path to the SQLite file |
 | `HIVESCOPE_HIVE_NODE` | `https://api.hive.blog` | Hive node used to verify accounts against |
+| `HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT` | *(empty, disabled)* | Hive account (case-insensitive) exempt from room ownership checks — can rename/re-delegate any room, not just ones it created or administers. Still no message-deletion or kick/ban privilege. |
 
 ## Running the tests
 

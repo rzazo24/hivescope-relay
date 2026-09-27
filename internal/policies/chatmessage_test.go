@@ -58,7 +58,7 @@ func TestChatMessagePolicy_AcceptsWithHiveLink(t *testing.T) {
 	linkEvent := &nostr.Event{
 		Kind:   HiveLinkKind,
 		PubKey: "abc",
-		Tags:   nostr.Tags{{"d", HiveLinkDTag}},
+		Tags:   nostr.Tags{{"d", HiveLinkDTag}, {"hive_account", "abc"}},
 	}
 	policy := NewChatMessagePolicy(fakeQueryEvents([]*nostr.Event{linkEvent}, nil))
 	ev := &nostr.Event{

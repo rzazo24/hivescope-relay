@@ -72,6 +72,7 @@ cambiar con variables de entorno:
 | `HIVESCOPE_LISTEN_ADDR` | `:3334` | dirección/puerto donde escucha el relé |
 | `HIVESCOPE_DB_PATH` | `./data/hivescope-relay.sqlite` | ruta del archivo SQLite |
 | `HIVESCOPE_HIVE_NODE` | `https://api.hive.blog` | nodo Hive contra el que se verifican las cuentas |
+| `HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT` | *(vacío, deshabilitado)* | cuenta Hive (sin distinguir mayúsculas/minúsculas) exenta de la comprobación de dueño de sala — puede renombrar/re-delegar cualquier sala, no solo las que creó o administra. Sigue sin tener privilegio de borrar mensajes ni de expulsar/silenciar cuentas. |
 
 ## Correr los tests
 

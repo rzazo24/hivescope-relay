@@ -26,6 +26,10 @@ func main() {
 	dbPath := getenv("HIVESCOPE_DB_PATH", "./data/hivescope-relay.sqlite")
 	hiveNode := getenv("HIVESCOPE_HIVE_NODE", hiveapi.DefaultNode)
 	addr := getenv("HIVESCOPE_LISTEN_ADDR", ":3334")
+	// Cuenta Hive (vacío = deshabilitado) que puede renombrar/editar
+	// cualquier sala, no solo las que creó o administra -- ver el punto 4 del
+	// comentario de NewRoomMetaPolicy.
+	superadminHiveAccount := getenv("HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT", "")
 
 	if dir := filepath.Dir(dbPath); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -59,7 +63,7 @@ func main() {
 		khatrupolicies.EventIPRateLimiter(5, time.Minute, 20),
 		policies.NewHiveLinkPolicy(hiveClient),
 		policies.NewChatMessagePolicy(db.QueryEvents),
-		policies.NewRoomMetaPolicy(db.QueryEvents),
+		policies.NewRoomMetaPolicy(db.QueryEvents, superadminHiveAccount),
 		policies.NewAllowedEventsPolicy(),
 	)
 

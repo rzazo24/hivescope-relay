@@ -87,7 +87,16 @@ is load-bearing, not incidental:
    control forward (the delegate can rename, or delegate further), it does
    **not** leave the original creator with a standing right to reclaim the
    room — they'd need to be re-added to `admin` by whoever currently
-   controls it.
+   controls it. `HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT` (env var, empty =
+   disabled; set to `rzazo24` in `docker-compose.yml`) names a single Hive
+   account exempt from the ownership check entirely — that account can
+   rename/re-delegate *any* room, not just ones it created or was delegated.
+   It's matched against `findLinkedHiveAccount`'s result (case-insensitively,
+   via `strings.EqualFold`), not the Nostr pubkey, specifically because a
+   Hive account can be linked from several different Nostr pubkeys/devices —
+   pinning this to one pubkey would break as soon as that operator logged in
+   from a new browser. Still requires the usual hive-link (rule 2); doesn't
+   grant message-deletion or kick/ban either, same scope as ordinary admins.
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay

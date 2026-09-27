@@ -10,16 +10,25 @@ import (
 
 const testAdminPubkey = "1111111111111111111111111111111111111111111111111111111111111111"
 
+// linkedEventFor arma un evento hive-link de prueba reusando pubkey también
+// como nombre de cuenta hive (no importa para la mayoría de los tests, que
+// solo necesitan "esta identidad está vinculada"). Para tests que sí
+// necesitan distinguir el pubkey firmante de la cuenta hive vinculada (por
+// ejemplo, el superadmin), usar linkedEventForAccount.
 func linkedEventFor(pubkey string) *nostr.Event {
+	return linkedEventForAccount(pubkey, pubkey)
+}
+
+func linkedEventForAccount(pubkey, hiveAccount string) *nostr.Event {
 	return &nostr.Event{
 		Kind:   HiveLinkKind,
 		PubKey: pubkey,
-		Tags:   nostr.Tags{{"d", HiveLinkDTag}},
+		Tags:   nostr.Tags{{"d", HiveLinkDTag}, {"hive_account", hiveAccount}},
 	}
 }
 
 func TestRoomMetaPolicy_IgnoresOtherKinds(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	reject, _ := policy(context.Background(), &nostr.Event{Kind: 1})
 	if reject {
 		t.Fatal("no debería rechazar eventos de otro kind")
@@ -28,7 +37,7 @@ func TestRoomMetaPolicy_IgnoresOtherKinds(t *testing.T) {
 
 func TestRoomMetaPolicy_IgnoresNonRoomDTag(t *testing.T) {
 	// Un evento kind:30078 con otro "d" (por ejemplo hive-link) no es de esta política.
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{Kind: AppDataKind, Tags: nostr.Tags{{"d", HiveLinkDTag}}}
 	reject, _ := policy(context.Background(), ev)
 	if reject {
@@ -37,7 +46,7 @@ func TestRoomMetaPolicy_IgnoresNonRoomDTag(t *testing.T) {
 }
 
 func TestRoomMetaPolicy_RejectsEmptyRoomSlug(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{Kind: AppDataKind, Tags: nostr.Tags{{"d", "room:"}}}
 	reject, msg := policy(context.Background(), ev)
 	if !reject || msg == "" {
@@ -46,7 +55,7 @@ func TestRoomMetaPolicy_RejectsEmptyRoomSlug(t *testing.T) {
 }
 
 func TestRoomMetaPolicy_RejectsMissingName(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{
 		Kind: AppDataKind,
 		Tags: nostr.Tags{{"d", "room:general"}, {"admin", testAdminPubkey}},
@@ -58,7 +67,7 @@ func TestRoomMetaPolicy_RejectsMissingName(t *testing.T) {
 }
 
 func TestRoomMetaPolicy_RejectsInvalidAdminPubkey(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{
 		Kind: AppDataKind,
 		Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "no-es-un-pubkey"}},
@@ -70,7 +79,7 @@ func TestRoomMetaPolicy_RejectsInvalidAdminPubkey(t *testing.T) {
 }
 
 func TestRoomMetaPolicy_RejectsWithoutHiveLink(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
@@ -84,7 +93,7 @@ func TestRoomMetaPolicy_RejectsWithoutHiveLink(t *testing.T) {
 
 func TestRoomMetaPolicy_AcceptsFirstCreationByLinkedAccount(t *testing.T) {
 	events := []*nostr.Event{linkedEventFor("creador")}
-	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
@@ -101,7 +110,7 @@ func TestRoomMetaPolicy_AcceptsUpdateBySameOwner(t *testing.T) {
 		linkedEventFor("creador"),
 		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General viejo"}}},
 	}
-	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
@@ -125,7 +134,7 @@ func TestRoomMetaPolicy_AcceptsUpdateByCurrentAdmin(t *testing.T) {
 			Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General viejo"}, {"admin", "delegado"}},
 		},
 	}
-	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "delegado",
@@ -165,7 +174,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 
 	// El creador original ya no es ni la fila vigente ni el admin vigente:
 	// debería quedar afuera a partir de la delegación.
-	rejectCreador, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil))(context.Background(), &nostr.Event{
+	rejectCreador, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",
 		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Reclamo viejo"}, {"admin", testAdminPubkey}},
@@ -175,7 +184,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	}
 
 	// Un tercero sigue sin poder reclamarla.
-	rejectOtro, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil))(context.Background(), &nostr.Event{
+	rejectOtro, _ := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "otro",
 		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}},
@@ -185,7 +194,7 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	}
 
 	// El delegado, dueño de la fila vigente, sí puede seguir actualizando.
-	rejectDelegado, msg := NewRoomMetaPolicy(fakeQueryEvents(events, nil))(context.Background(), &nostr.Event{
+	rejectDelegado, msg := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")(context.Background(), &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "delegado",
 		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "General más nuevo"}, {"admin", testAdminPubkey}},
@@ -195,13 +204,93 @@ func TestRoomMetaPolicy_ResolvesOwnershipFromNewestRowAcrossAuthors(t *testing.T
 	}
 }
 
+func TestRoomMetaPolicy_SuperadminCanUpdateAnyRoom(t *testing.T) {
+	// "operador", cuya cuenta hive vinculada es "rzazo24" (el superadmin
+	// configurado), no es ni dueño ni admin de la sala -- pero al ser el
+	// superadmin debería poder actualizarla igual.
+	events := []*nostr.Event{
+		linkedEventFor("creador"),
+		linkedEventForAccount("operador", "rzazo24"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "rzazo24")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "operador",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada por el superadmin"}, {"admin", testAdminPubkey}},
+	}
+	reject, msg := policy(context.Background(), ev)
+	if reject {
+		t.Fatalf("el superadmin debería poder actualizar una sala que no le pertenece, rechazado: %s", msg)
+	}
+}
+
+func TestRoomMetaPolicy_SuperadminMatchIsCaseInsensitive(t *testing.T) {
+	events := []*nostr.Event{
+		linkedEventFor("creador"),
+		linkedEventForAccount("operador", "RzAzO24"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "rzazo24")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "operador",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}},
+	}
+	reject, msg := policy(context.Background(), ev)
+	if reject {
+		t.Fatalf("la comparación de la cuenta superadmin debería ignorar mayúsculas/minúsculas, rechazado: %s", msg)
+	}
+}
+
+func TestRoomMetaPolicy_NonSuperadminAccountStillRejectedForOthersRooms(t *testing.T) {
+	// El superadmin está configurado como "rzazo24", pero quien firma este
+	// evento tiene vinculada otra cuenta hive distinta -- no debería
+	// beneficiarse del bypass.
+	events := []*nostr.Event{
+		linkedEventFor("creador"),
+		linkedEventForAccount("otro", "cuenta-cualquiera"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "rzazo24")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "otro",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}},
+	}
+	reject, _ := policy(context.Background(), ev)
+	if !reject {
+		t.Fatal("una cuenta hive que no es la superadmin configurada no debería poder tocar salas ajenas")
+	}
+}
+
+func TestRoomMetaPolicy_SuperadminDisabledWhenUnconfigured(t *testing.T) {
+	// Con superadminHiveAccount == "" (valor por defecto, HIVESCOPE_SUPERADMIN_HIVE_ACCOUNT
+	// sin configurar), ni siquiera la cuenta "rzazo24" tiene ningún privilegio especial.
+	events := []*nostr.Event{
+		linkedEventFor("creador"),
+		linkedEventForAccount("operador", "rzazo24"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "operador",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}},
+	}
+	reject, _ := policy(context.Background(), ev)
+	if !reject {
+		t.Fatal("sin superadminHiveAccount configurado, nadie debería tener el bypass, ni siquiera la cuenta que sería la superadmin")
+	}
+}
+
 func TestRoomMetaPolicy_RejectsClaimByDifferentPubkey(t *testing.T) {
 	events := []*nostr.Event{
 		linkedEventFor("creador"),
 		linkedEventFor("otro"),
 		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}}},
 	}
-	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "otro",
@@ -214,7 +303,7 @@ func TestRoomMetaPolicy_RejectsClaimByDifferentPubkey(t *testing.T) {
 }
 
 func TestRoomMetaPolicy_PropagatesQueryError(t *testing.T) {
-	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, errors.New("db down")))
+	policy := NewRoomMetaPolicy(fakeQueryEvents(nil, errors.New("db down")), "")
 	ev := &nostr.Event{
 		Kind:   AppDataKind,
 		PubKey: "creador",

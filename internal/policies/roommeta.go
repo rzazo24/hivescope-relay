@@ -42,11 +42,21 @@ const RoomMetaDTagPrefix = "room:"
 //     puede delegar la administración en otra cuenta publicando con un
 //     "admin" distinto, y desde ese momento es esa cuenta delegada la que
 //     controla la sala hacia adelante (ver findRoomOwnership).
+//  4. Si superadminHiveAccount no está vacío, la cuenta Hive vinculada con
+//     ese nombre (comparado sin distinguir mayúsculas/minúsculas) se salta
+//     por completo la regla 3: puede actualizar los metadatos de CUALQUIER
+//     sala, no solo las que creó o administra, sin dejar de necesitar una
+//     vinculación hive válida (regla 2). Sigue aplicando el "primer
+//     registrante es dueño" para nombres de sala todavía libres -- esto no
+//     le da ningún privilegio ahí, solo le permite saltarse el bloqueo de
+//     "ya existe y no sos su dueño". Pensado para un único operador del
+//     relé (a pedido explícito del usuario, alcance elegido: solo
+//     renombrar/editar, no borrar mensajes ni expulsar cuentas).
 //
 // Eventos de otro kind, o eventos kind:30078 cuyo "d" no empieza con
 // "room:" (por ejemplo el de vinculación, "hive-link"), no son evaluados por
 // esta política: devuelve (false, "") y deja que otras políticas decidan.
-func NewRoomMetaPolicy(queryEvents QueryEventsFunc) func(ctx context.Context, event *nostr.Event) (bool, string) {
+func NewRoomMetaPolicy(queryEvents QueryEventsFunc, superadminHiveAccount string) func(ctx context.Context, event *nostr.Event) (bool, string) {
 	return func(ctx context.Context, event *nostr.Event) (bool, string) {
 		if event.Kind != AppDataKind {
 			return false, ""
@@ -71,19 +81,20 @@ func NewRoomMetaPolicy(queryEvents QueryEventsFunc) func(ctx context.Context, ev
 			return true, "invalid: the \"admin\" tag must be a valid nostr pubkey (64 hex characters)"
 		}
 
-		linked, err := hasVerifiedHiveLink(ctx, queryEvents, event.PubKey)
+		linkedAccount, err := findLinkedHiveAccount(ctx, queryEvents, event.PubKey)
 		if err != nil {
 			return true, fmt.Sprintf("error: could not check this pubkey's hive link: %v", err)
 		}
-		if !linked {
+		if linkedAccount == "" {
 			return true, "invalid: only linked hive accounts can create or administer rooms (missing kind 30078 d=hive-link event)"
 		}
+		isSuperadmin := superadminHiveAccount != "" && strings.EqualFold(linkedAccount, superadminHiveAccount)
 
 		ownership, err := findRoomOwnership(ctx, queryEvents, d)
 		if err != nil {
 			return true, fmt.Sprintf("error: could not check ownership of room %q: %v", roomSlug, err)
 		}
-		if ownership.owner != "" && event.PubKey != ownership.owner && event.PubKey != ownership.admin {
+		if !isSuperadmin && ownership.owner != "" && event.PubKey != ownership.owner && event.PubKey != ownership.admin {
 			return true, fmt.Sprintf("invalid: room %q already exists and can only be updated by its creator or current admin", roomSlug)
 		}
 
