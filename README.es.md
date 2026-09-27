@@ -1,5 +1,7 @@
 # hivescope-relay
 
+[![CI](https://github.com/rzazo24/hivescope-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/rzazo24/hivescope-relay/actions/workflows/ci.yml)
+
 *[Read in English](README.md)*
 
 Relé [Nostr](https://nostr.com/) self-hosted, escrito en Go con
