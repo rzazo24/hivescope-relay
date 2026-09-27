@@ -124,6 +124,38 @@ nombre (`relay-data`, `caddy-data`, `caddy-config`), así que sobreviven a un
    certificado con `docker compose logs -f caddy` — si el DNS y los dos
    firewalls están bien, en general se resuelve en segundos.
 
+### Copias de seguridad
+
+`scripts/backup-db.sh` hace una copia consistente de la base SQLite (usando
+el propio comando `.backup` de sqlite3, seguro incluso con el relé
+escribiendo en ese momento — no es una copia cruda del archivo) y la
+comprime con gzip. Corre en un contenedor Alpine desechable que monta el
+mismo volumen Docker `relay-data` en modo lectura, así que no necesita nada
+instalado en el host aparte de Docker.
+
+```bash
+./scripts/backup-db.sh
+```
+
+Por defecto escribe en `~/backups/hivescope-relay/` y borra los backups de
+más de 14 días; ambas cosas se pueden cambiar con las variables de entorno
+`BACKUP_DIR` y `RETENTION_DAYS`. En el VPS de producción está programado a
+diario con cron:
+
+```
+17 3 * * * /ruta/a/hivescope-relay/scripts/backup-db.sh >> ~/backups/hivescope-relay/backup.log 2>&1
+```
+
+Para restaurar, parar el relé, descomprimir un backup encima del archivo de
+base del volumen, y arrancarlo de nuevo:
+
+```bash
+docker compose stop relay
+gunzip -c ~/backups/hivescope-relay/hivescope-relay-<timestamp>.sqlite.gz \
+  | docker run --rm -i -v nostr-relay_relay-data:/data alpine:3.20 sh -c 'cat > /data/hivescope-relay.sqlite'
+docker compose start relay
+```
+
 ## Vincular una cuenta Hive (para el frontend)
 
 Un cliente tiene que publicar un evento `kind:30078` así:

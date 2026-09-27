@@ -123,6 +123,37 @@ SQLite data and Caddy's certificates live in named volumes (`relay-data`,
    certificate's progress with `docker compose logs -f caddy` — if DNS and
    both firewalls are set up correctly, it usually resolves within seconds.
 
+### Backups
+
+`scripts/backup-db.sh` takes a consistent snapshot of the SQLite database
+(using sqlite3's own `.backup` command, safe even while the relay is
+writing to it — not a raw file copy) and gzips it. It runs in a throwaway
+Alpine container that mounts the same `relay-data` Docker volume read-only,
+so it works without needing anything installed on the host besides Docker.
+
+```bash
+./scripts/backup-db.sh
+```
+
+By default it writes to `~/backups/hivescope-relay/` and deletes backups
+older than 14 days; both are configurable via `BACKUP_DIR` and
+`RETENTION_DAYS` env vars. On the production VPS it's scheduled daily via
+cron:
+
+```
+17 3 * * * /path/to/hivescope-relay/scripts/backup-db.sh >> ~/backups/hivescope-relay/backup.log 2>&1
+```
+
+To restore, stop the relay, gunzip a backup over the volume's database file,
+and start it again:
+
+```bash
+docker compose stop relay
+gunzip -c ~/backups/hivescope-relay/hivescope-relay-<timestamp>.sqlite.gz \
+  | docker run --rm -i -v nostr-relay_relay-data:/data alpine:3.20 sh -c 'cat > /data/hivescope-relay.sqlite'
+docker compose start relay
+```
+
 ## Linking a Hive account (for the frontend)
 
 A client needs to publish a `kind:30078` event like this:
