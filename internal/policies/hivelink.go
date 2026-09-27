@@ -63,30 +63,30 @@ func NewHiveLinkPolicy(hiveClient *hiveapi.Client) func(ctx context.Context, eve
 		keyType := event.Tags.Find("hive_key_type").Value()
 
 		if account == "" {
-			return true, "invalid: falta el tag hive_account"
+			return true, "invalid: missing hive_account tag"
 		}
 		if sig == "" {
-			return true, "invalid: falta el tag hive_sig"
+			return true, "invalid: missing hive_sig tag"
 		}
 		if keyType == "" {
 			keyType = "posting"
 		}
 		if keyType != "posting" {
-			return true, "invalid: hive_key_type debe ser \"posting\" (todavía no se soportan otros tipos)"
+			return true, "invalid: hive_key_type must be \"posting\" (no other types are supported yet)"
 		}
 
 		postingKey, err := hiveClient.GetPostingPublicKey(ctx, account)
 		if err != nil {
-			return true, fmt.Sprintf("error: no se pudo verificar la cuenta hive %q: %v", account, err)
+			return true, fmt.Sprintf("error: could not verify hive account %q: %v", account, err)
 		}
 
 		challenge := LinkChallenge(event.PubKey)
 		valid, err := hivecrypto.VerifySignature([]byte(challenge), sig, postingKey)
 		if err != nil {
-			return true, fmt.Sprintf("invalid: hive_sig malformada: %v", err)
+			return true, fmt.Sprintf("invalid: malformed hive_sig: %v", err)
 		}
 		if !valid {
-			return true, "invalid: hive_sig no corresponde a la clave posting de esa cuenta hive"
+			return true, "invalid: hive_sig does not match that hive account's posting key"
 		}
 
 		return false, ""

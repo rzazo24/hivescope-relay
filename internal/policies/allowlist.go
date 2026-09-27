@@ -42,9 +42,9 @@ func NewAllowedEventsPolicy() func(ctx context.Context, event *nostr.Event) (boo
 			if d == HiveLinkDTag || strings.HasPrefix(d, RoomMetaDTagPrefix) {
 				return false, ""
 			}
-			return true, "invalid: este relé no acepta eventos kind 30078 con \"d\" distinto de \"hive-link\" o \"room:<sala>\""
+			return true, "invalid: this relay only accepts kind 30078 events with \"d\" = \"hive-link\" or \"room:<name>\""
 		default:
-			return true, fmt.Sprintf("invalid: este relé solo acepta eventos de hivescope-relay (kind 9, o kind 30078 hive-link/room); kind %d no está permitido", event.Kind)
+			return true, fmt.Sprintf("invalid: this relay only accepts hivescope-relay events (kind 9, or kind 30078 hive-link/room); kind %d is not allowed", event.Kind)
 		}
 	}
 }

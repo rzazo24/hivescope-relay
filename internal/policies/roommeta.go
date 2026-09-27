@@ -54,32 +54,32 @@ func NewRoomMetaPolicy(queryEvents QueryEventsFunc) func(ctx context.Context, ev
 
 		roomSlug := strings.TrimPrefix(d, RoomMetaDTagPrefix)
 		if roomSlug == "" {
-			return true, "invalid: el nombre de sala en el tag \"d\" (room:<sala>) no puede estar vacío"
+			return true, "invalid: the room name in the \"d\" tag (room:<name>) can't be empty"
 		}
 
 		if event.Tags.Find("name").Value() == "" {
-			return true, "invalid: falta el tag \"name\" con el nombre visible de la sala"
+			return true, "invalid: missing \"name\" tag with the room's display name"
 		}
 
 		admin := event.Tags.Find("admin").Value()
 		if !nostr.IsValid32ByteHex(admin) {
-			return true, "invalid: el tag \"admin\" debe ser un pubkey nostr válido (64 caracteres hex)"
+			return true, "invalid: the \"admin\" tag must be a valid nostr pubkey (64 hex characters)"
 		}
 
 		linked, err := hasVerifiedHiveLink(ctx, queryEvents, event.PubKey)
 		if err != nil {
-			return true, fmt.Sprintf("error: no se pudo comprobar la vinculación hive de este pubkey: %v", err)
+			return true, fmt.Sprintf("error: could not check this pubkey's hive link: %v", err)
 		}
 		if !linked {
-			return true, "invalid: solo cuentas hive vinculadas pueden crear o administrar salas (falta el evento kind 30078 d=hive-link)"
+			return true, "invalid: only linked hive accounts can create or administer rooms (missing kind 30078 d=hive-link event)"
 		}
 
 		owner, err := findRoomOwner(ctx, queryEvents, d)
 		if err != nil {
-			return true, fmt.Sprintf("error: no se pudo comprobar la propiedad de la sala %q: %v", roomSlug, err)
+			return true, fmt.Sprintf("error: could not check ownership of room %q: %v", roomSlug, err)
 		}
 		if owner != "" && owner != event.PubKey {
-			return true, fmt.Sprintf("invalid: la sala %q ya existe y pertenece a otro pubkey administrador", roomSlug)
+			return true, fmt.Sprintf("invalid: room %q already exists and belongs to a different admin pubkey", roomSlug)
 		}
 
 		return false, ""

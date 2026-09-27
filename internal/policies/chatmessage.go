@@ -40,15 +40,15 @@ func NewChatMessagePolicy(queryEvents QueryEventsFunc) func(ctx context.Context,
 		}
 
 		if event.Tags.Find("t").Value() == "" {
-			return true, "invalid: falta el tag \"t\" con el nombre de la sala"
+			return true, "invalid: missing \"t\" tag with the room name"
 		}
 
 		linked, err := hasVerifiedHiveLink(ctx, queryEvents, event.PubKey)
 		if err != nil {
-			return true, fmt.Sprintf("error: no se pudo comprobar la vinculación hive de este pubkey: %v", err)
+			return true, fmt.Sprintf("error: could not check this pubkey's hive link: %v", err)
 		}
 		if !linked {
-			return true, "invalid: este pubkey todavía no vinculó una cuenta hive (falta el evento kind 30078 d=hive-link)"
+			return true, "invalid: this pubkey hasn't linked a hive account yet (missing kind 30078 d=hive-link event)"
 		}
 
 		return false, ""
