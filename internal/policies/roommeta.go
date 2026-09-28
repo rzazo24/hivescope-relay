@@ -52,6 +52,10 @@ const RoomMetaDTagPrefix = "room:"
 //     puede delegar la administración en otra cuenta publicando con un
 //     "admin" distinto, y desde ese momento es esa cuenta delegada la que
 //     controla la sala hacia adelante (ver findRoomOwnership).
+//     Un pubkey distinto que esté vinculado a la MISMA cuenta Hive que el
+//     dueño o el admin vigentes también puede actualizar (ver
+//     sharesHiveAccount): cada navegador/dispositivo genera su propio pubkey,
+//     pero la identidad real es la cuenta Hive.
 //  4. Si superadminHiveAccount no está vacío, la cuenta Hive vinculada con
 //     ese nombre (comparado sin distinguir mayúsculas/minúsculas) se salta
 //     por completo la regla 3: puede actualizar los metadatos de CUALQUIER
@@ -109,11 +113,41 @@ func NewRoomMetaPolicy(queryEvents QueryEventsFunc, superadminHiveAccount string
 			return true, fmt.Sprintf("error: could not check ownership of room %q: %v", roomSlug, err)
 		}
 		if !isSuperadmin && ownership.owner != "" && event.PubKey != ownership.owner && event.PubKey != ownership.admin {
-			return true, fmt.Sprintf("invalid: room %q already exists and can only be updated by its creator or current admin", roomSlug)
+			// Otro pubkey (otro navegador/dispositivo) de la MISMA cuenta Hive
+			// que el dueño o el admin también cuenta como ellos: la identidad
+			// real es la cuenta Hive, el pubkey de Nostr es solo la clave de
+			// sesión de cada dispositivo.
+			sameAccount, err := sharesHiveAccount(ctx, queryEvents, linkedAccount, ownership.owner, ownership.admin)
+			if err != nil {
+				return true, fmt.Sprintf("error: could not check ownership of room %q: %v", roomSlug, err)
+			}
+			if !sameAccount {
+				return true, fmt.Sprintf("invalid: room %q already exists and can only be updated by its owner or admin (or another device linked to the same hive account)", roomSlug)
+			}
 		}
 
 		return false, ""
 	}
+}
+
+// sharesHiveAccount dice si account (la cuenta Hive vinculada al pubkey que
+// publica, ya verificada) coincide -- sin distinguir mayúsculas -- con la
+// cuenta vinculada a alguno de los pubkeys dados (dueño y admin vigentes de la
+// sala). Un pubkey sin vinculación no aporta ninguna cuenta.
+func sharesHiveAccount(ctx context.Context, queryEvents QueryEventsFunc, account string, pubkeys ...string) (bool, error) {
+	for _, pk := range pubkeys {
+		if pk == "" {
+			continue
+		}
+		other, err := findLinkedHiveAccount(ctx, queryEvents, pk)
+		if err != nil {
+			return false, err
+		}
+		if other != "" && strings.EqualFold(other, account) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // roomOwnership junta, para una sala ya existente, tanto el pubkey que la

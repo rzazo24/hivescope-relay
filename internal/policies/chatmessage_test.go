@@ -3,6 +3,7 @@ package policies
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -15,6 +16,11 @@ func fakeQueryEvents(events []*nostr.Event, err error) QueryEventsFunc {
 		}
 		ch := make(chan *nostr.Event, len(events))
 		for _, e := range events {
+			// El backend real respeta Authors; el resto de filtros (kinds, tags)
+			// los revalidan las propias políticas, así que no se replican aquí.
+			if len(filter.Authors) > 0 && !slices.Contains(filter.Authors, e.PubKey) {
+				continue
+			}
 			ch <- e
 		}
 		close(ch)

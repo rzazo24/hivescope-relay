@@ -97,6 +97,14 @@ is load-bearing, not incidental:
    pinning this to one pubkey would break as soon as that operator logged in
    from a new browser. Still requires the usual hive-link (rule 2); doesn't
    grant message-deletion or kick/ban either, same scope as ordinary admins.
+   **Ownership is really per Hive account, not per pubkey**: every
+   browser/device generates its own Nostr pubkey, so a pubkey that isn't the
+   owner/admin but is linked to the *same Hive account* as the owner's or
+   admin's pubkey is also accepted (`sharesHiveAccount`, via
+   `findLinkedHiveAccount`, case-insensitive). Without that, creating a room
+   on a phone locked you out of it on your PC. It's only checked after the
+   cheap exact-pubkey/superadmin checks fail. The frontend mirrors the rule
+   in `canManageRoom` (cosmetic; the relay decides).
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay

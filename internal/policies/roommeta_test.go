@@ -331,6 +331,76 @@ func TestRoomMetaPolicy_SuperadminDisabledWhenUnconfigured(t *testing.T) {
 	}
 }
 
+func TestRoomMetaPolicy_AcceptsUpdateFromAnotherDeviceOfTheOwnersHiveAccount(t *testing.T) {
+	// "movil" y "pc" son dos pubkeys (dispositivos) de la misma cuenta "ana".
+	events := []*nostr.Event{
+		linkedEventForAccount("movil", "ana"),
+		linkedEventForAccount("pc", "Ana"), // mayúsculas distintas
+		{Kind: AppDataKind, PubKey: "movil", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "movil"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "pc",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Desde el PC"}, {"admin", testAdminPubkey}, futureExpiration()},
+	}
+	if reject, msg := policy(context.Background(), ev); reject {
+		t.Fatalf("otro dispositivo de la misma cuenta debería poder editar, rechazado: %s", msg)
+	}
+}
+
+func TestRoomMetaPolicy_AcceptsUpdateFromAnotherDeviceOfTheAdminsHiveAccount(t *testing.T) {
+	events := []*nostr.Event{
+		linkedEventForAccount("creador", "ana"),
+		linkedEventForAccount("delegado", "bea"),
+		linkedEventForAccount("delegado-pc", "bea"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "delegado"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "delegado-pc",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Renombrada"}, {"admin", testAdminPubkey}, futureExpiration()},
+	}
+	if reject, msg := policy(context.Background(), ev); reject {
+		t.Fatalf("otro dispositivo de la cuenta del admin debería poder editar, rechazado: %s", msg)
+	}
+}
+
+func TestRoomMetaPolicy_RejectsDeviceOfADifferentHiveAccount(t *testing.T) {
+	events := []*nostr.Event{
+		linkedEventForAccount("creador", "ana"),
+		linkedEventForAccount("intruso", "carla"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "intruso",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "Suplantada"}, {"admin", testAdminPubkey}, futureExpiration()},
+	}
+	if reject, _ := policy(context.Background(), ev); !reject {
+		t.Fatal("un pubkey de otra cuenta Hive no debería poder editar")
+	}
+}
+
+func TestRoomMetaPolicy_RejectsWhenTheOwnerHasNoLinkedAccountToShare(t *testing.T) {
+	// El dueño no tiene vinculación (dato raro/manual): no hay cuenta que compartir.
+	events := []*nostr.Event{
+		linkedEventForAccount("intruso", "carla"),
+		{Kind: AppDataKind, PubKey: "creador", Tags: nostr.Tags{{"d", "room:general"}, {"name", "General"}, {"admin", "creador"}}},
+	}
+	policy := NewRoomMetaPolicy(fakeQueryEvents(events, nil), "")
+	ev := &nostr.Event{
+		Kind:   AppDataKind,
+		PubKey: "intruso",
+		Tags:   nostr.Tags{{"d", "room:general"}, {"name", "X"}, {"admin", testAdminPubkey}, futureExpiration()},
+	}
+	if reject, _ := policy(context.Background(), ev); !reject {
+		t.Fatal("sin cuenta vinculada del dueño/admin no debería aceptarse")
+	}
+}
+
 func TestRoomMetaPolicy_RejectsClaimByDifferentPubkey(t *testing.T) {
 	events := []*nostr.Event{
 		linkedEventFor("creador"),

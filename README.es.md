@@ -20,7 +20,7 @@ antes de guardarlos.
 |---|---|---|
 | Vinculación de identidad Hive↔Nostr | `30078`, `d=hive-link` | El `hive_sig` debe ser una firma real, hecha con la clave **posting** de la cuenta `hive_account`, sobre el mensaje `hivescope-relay-link:<pubkey_nostr>`. Se verifica contra la clave posting real, consultada en vivo a un nodo Hive. |
 | Mensaje de chat | `9` | Requiere el tag `t` (sala) y que el pubkey emisor tenga ya un evento de vinculación válido guardado. |
-| Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name`, un `admin` (pubkey nostr válido) y una `expiration` (NIP-40, timestamp unix futuro), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su dueña; a partir de ahí, solo la dueña actual de la sala o el pubkey indicado en su tag `admin` pueden seguir publicando actualizaciones (renombrarla, o delegar la administración en otra cuenta). |
+| Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name`, un `admin` (pubkey nostr válido) y una `expiration` (NIP-40, timestamp unix futuro), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su dueña; a partir de ahí, solo la dueña actual de la sala o el pubkey indicado en su tag `admin` —o cualquier otro pubkey vinculado a la misma cuenta Hive que uno de ellos, es decir, tus otros dispositivos— pueden seguir publicando actualizaciones (renombrarla, o delegar la administración en otra cuenta). |
 
 Cualquier evento que no encaje en una de estas tres formas —cualquier otro
 kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
