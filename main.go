@@ -64,10 +64,16 @@ func main() {
 	// las llamadas a la API de Hive (NewHiveLinkPolicy) o consultas a la
 	// base (NewChatMessagePolicy/NewRoomMetaPolicy) por cada uno.
 	relay.RejectEvent = append(relay.RejectEvent,
-		khatrupolicies.EventIPRateLimiter(5, time.Minute, 20),
+		// Los latidos de presencia tienen su propio cupo por IP (más holgado)
+		// para no gastar el del chat ni el de otras personas tras la misma IP.
+		policies.SplitRateLimit(
+			khatrupolicies.EventIPRateLimiter(30, time.Minute, 60),
+			khatrupolicies.EventIPRateLimiter(5, time.Minute, 20),
+		),
 		policies.NewHiveLinkPolicy(hiveClient),
 		policies.NewChatMessagePolicy(db.QueryEvents),
 		policies.NewRoomMetaPolicy(db.QueryEvents, superadminHiveAccount),
+		policies.NewPresencePolicy(db.QueryEvents),
 		policies.NewAllowedEventsPolicy(),
 	)
 

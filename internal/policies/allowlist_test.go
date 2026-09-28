@@ -70,3 +70,10 @@ func TestAllowedEventsPolicy_AllowsDeletionRequests(t *testing.T) {
 		t.Fatal("no debería rechazar eventos kind 5 (borrado NIP-09)")
 	}
 }
+
+func TestAllowedEventsPolicy_AcceptsPresenceHeartbeats(t *testing.T) {
+	policy := NewAllowedEventsPolicy()
+	if reject, msg := policy(context.Background(), &nostr.Event{Kind: PresenceKind}); reject {
+		t.Fatalf("los latidos de presencia deberían pasar la lista blanca, rechazado: %s", msg)
+	}
+}

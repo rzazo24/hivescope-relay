@@ -127,6 +127,21 @@ is load-bearing, not incidental:
    rejection). Don't reintroduce that by narrowing the switch back down to
    just `ChatMessageKind`.
 
+**Presence** (`presence.go`, `PresenceKind` = 20078, an *ephemeral* kind —
+khatru relays it to subscribers and stores nothing): each linked client
+publishes a heartbeat every ~25 s with a `t` tag = the room it's in (none =
+the room list) and a `left` tag on the way out; clients count distinct Hive
+accounts with a fresh beat. `NewPresencePolicy` requires a verified hive-link
+(so "online" means real linked accounts), empty content, only those tags, and
+`created_at` within ±120 s of the relay clock. Heartbeats get their **own IP
+rate limiter** (`SplitRateLimit`, 30/min burst 60) — sharing the chat one (5/min)
+would let a couple of tabs behind one IP starve real events. Two khatru
+quirks: an ephemeral event nobody is subscribed to answers `OK false "mute: no
+one was listening"` (harmless: the sender always listens to its own), and the
+relay stores/keeps no history, so a newcomer only learns who's online from
+live beats — the frontend solves that with a short randomized "welcome beat"
+reply, not with any relay support.
+
 `kinds.go` holds `AppDataKind` (`30078`), shared by both `hive-link` and
 `room:*` since they're the same NIP-78 kind distinguished only by their `d`
 tag.

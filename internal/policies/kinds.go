@@ -7,3 +7,11 @@ package policies
 //   - HiveLinkDTag ("hive-link"): vinculación de identidad Hive<->Nostr.
 //   - el prefijo RoomMetaDTagPrefix ("room:"): metadatos de sala.
 const AppDataKind = 30078
+
+// PresenceKind es un kind EFÍMERO (20000-29999): el relé lo reenvía a los
+// suscriptores pero no lo guarda. Es el "latido" de presencia: cada cliente
+// vinculado lo publica cada pocos segundos indicando en qué sala está (tag
+// "t"; sin tag = en la lista de salas) y los demás cuentan cuentas Hive
+// distintas con un latido reciente. Un latido con el tag "left" retira la
+// presencia al salir. Ver NewPresencePolicy.
+const PresenceKind = 20078

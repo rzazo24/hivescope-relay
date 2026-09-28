@@ -29,6 +29,8 @@ HiveScope chat.
 
 A chat message can be deleted (NIP-09) by the pubkey that sent it or by any other pubkey linked to the same Hive account; other kinds only by the same pubkey.
 
+Presence: linked clients publish ephemeral heartbeats (kind `20078`, forwarded but never stored, with their own rate limit) so everyone can see how many Hive accounts are online, in total and per room.
+
 ## Room expiration and cleanup
 
 Rooms aren't permanent: every room-metadata event carries a NIP-40
