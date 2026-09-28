@@ -105,6 +105,14 @@ is load-bearing, not incidental:
    on a phone locked you out of it on your PC. It's only checked after the
    cheap exact-pubkey/superadmin checks fail. The frontend mirrors the rule
    in `canManageRoom` (cosmetic; the relay decides).
+   **Deleting messages is per Hive account too** (`deletion.go`,
+   `NewDeletionOutcome`, registered on khatru's `OverwriteDeletionOutcome`).
+   khatru's default is "same pubkey only", but when an overwrite function
+   exists khatru uses *its* result instead of that rule, so it re-implements it:
+   same pubkey always; and, for `kind:9` chat messages only, another pubkey
+   linked to the same Hive account. Not extended to other kinds on purpose —
+   otherwise one device could delete another device's `hive-link` or a room.
+   Denies on any lookup error or missing link.
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay

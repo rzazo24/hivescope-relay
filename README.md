@@ -27,6 +27,8 @@ a `30078` event with a different `d` — is rejected outright. This relay is
 not meant to be a general-purpose Nostr relay; it exists only to back the
 HiveScope chat.
 
+A chat message can be deleted (NIP-09) by the pubkey that sent it or by any other pubkey linked to the same Hive account; other kinds only by the same pubkey.
+
 ## Room expiration and cleanup
 
 Rooms aren't permanent: every room-metadata event carries a NIP-40

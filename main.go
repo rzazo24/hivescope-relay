@@ -71,6 +71,10 @@ func main() {
 		policies.NewAllowedEventsPolicy(),
 	)
 
+	// Quién puede borrar un mensaje (NIP-09): el mismo pubkey, o cualquier otro
+	// dispositivo vinculado a la misma cuenta Hive -- ver NewDeletionOutcome.
+	relay.OverwriteDeletionOutcome = append(relay.OverwriteDeletionOutcome, policies.NewDeletionOutcome(db.QueryEvents))
+
 	relay.RejectFilter = append(relay.RejectFilter,
 		khatrupolicies.FilterIPRateLimiter(20, time.Minute, 60),
 	)

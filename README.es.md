@@ -27,6 +27,8 @@ kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
 relé no está pensado como un relé Nostr de propósito general: existe solo
 para dar soporte al chat de HiveScope.
 
+Un mensaje de chat puede borrarlo (NIP-09) el pubkey que lo envió o cualquier otro pubkey vinculado a la misma cuenta Hive; el resto de kinds, solo el mismo pubkey.
+
 ## Caducidad de salas y limpieza
 
 Las salas no son permanentes: todo evento de metadatos de sala lleva una
