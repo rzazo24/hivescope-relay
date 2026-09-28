@@ -33,6 +33,12 @@ go run .
 # end-to-end smoke test against a running relay (Node + nostr-tools)
 cd test && npm install && RELAY_URL=ws://localhost:3334 npm test
 
+# self-heal check (cron, every 2 min): pings the chat and the relay's NIP-11
+# over HTTPS and restarts caddy/relay after 2 consecutive failures (10 min
+# cooldown); log in ~/backups/hivescope-relay/healthcheck.log. It cannot alert
+# anyone, and can't help if the whole machine is down.
+./scripts/healthcheck.sh
+
 # full stack via Docker (relay + Caddy reverse proxy with TLS)
 docker compose up -d --build
 

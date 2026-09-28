@@ -229,3 +229,7 @@ un lado sin el otro.
 ## Licencia
 
 [MIT](LICENSE)
+
+## Chequeo de salud
+
+`scripts/healthcheck.sh` (lanzado por cron cada 2 minutos) pide por HTTPS el chat y el documento NIP-11 del relé; tras dos fallos seguidos reinicia `caddy` (si cae el chat) o `relay` (si solo cae el relé), como mucho una vez cada 10 minutos, y deja constancia en `~/backups/hivescope-relay/healthcheck.log`. Solo se recupera solo: no avisa a nadie y no sirve si cae la máquina entera.

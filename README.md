@@ -224,3 +224,7 @@ changed on one side without the other.
 ## License
 
 [MIT](LICENSE)
+
+## Self-healing check
+
+`scripts/healthcheck.sh` (run from cron every 2 minutes) requests the chat and the relay's NIP-11 document over HTTPS; after two consecutive failures it restarts `caddy` (chat down) or `relay` (only the relay down), at most once every 10 minutes, and logs to `~/backups/hivescope-relay/healthcheck.log`. It only self-recovers: it notifies nobody and can't help if the machine itself is down.
