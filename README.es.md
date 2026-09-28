@@ -29,7 +29,7 @@ para dar soporte al chat de HiveScope.
 
 Un mensaje de chat puede borrarlo (NIP-09) el pubkey que lo envió o cualquier otro pubkey vinculado a la misma cuenta Hive; el resto de kinds, solo el mismo pubkey.
 
-Presencia: los clientes vinculados publican latidos efímeros (kind `20078`, reenviados pero nunca guardados, con su propio límite de velocidad) para que todos vean cuántas cuentas Hive están en línea, en total y por sala.
+Presencia: los clientes vinculados publican latidos efímeros (kind `20078`, reenviados pero nunca guardados, con su propio límite de velocidad) para que todos vean cuántas cuentas Hive están en línea, en total y por sala. El mismo latido lleva un tag `typing` para el aviso «está escribiendo…».
 
 ## Caducidad de salas y limpieza
 

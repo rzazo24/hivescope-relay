@@ -133,7 +133,10 @@ publishes a heartbeat every ~25 s with a `t` tag = the room it's in (none =
 the room list) and a `left` tag on the way out; clients count distinct Hive
 accounts with a fresh beat. `NewPresencePolicy` requires a verified hive-link
 (so "online" means real linked accounts), empty content, only those tags, and
-`created_at` within ±120 s of the relay clock. Heartbeats get their **own IP
+`created_at` within ±120 s of the relay clock. A `typing` tag (only valid
+together with `t`) marks the beat as "is typing in this room" — that's the whole
+"is typing…" feature, the relay treats it as one more presence beat (same
+limiter, so the frontend throttles it to one per 4 s). Heartbeats get their **own IP
 rate limiter** (`SplitRateLimit`, 30/min burst 60) — sharing the chat one (5/min)
 would let a couple of tabs behind one IP starve real events. Two khatru
 quirks: an ephemeral event nobody is subscribed to answers `OK false "mute: no

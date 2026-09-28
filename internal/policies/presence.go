@@ -20,6 +20,7 @@ var presenceRoomSlug = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 //	tags:
 //	  ["t", "<sala>"]   (opcional; sin él, el usuario está en la lista de salas)
 //	  ["left"]          (opcional; el usuario acaba de salir)
+//	  ["typing"]        (opcional; está escribiendo en la sala "t"; exige ese tag)
 //	content: ""
 //
 // Solo pubkeys con vinculación hive verificada pueden anunciar presencia (así
@@ -35,13 +36,20 @@ func NewPresencePolicy(queryEvents QueryEventsFunc) func(ctx context.Context, ev
 		if event.Content != "" {
 			return true, "invalid: presence events must have empty content"
 		}
+		hasRoom, typing := false, false
 		for _, tag := range event.Tags {
 			switch {
 			case len(tag) == 2 && tag[0] == "t" && presenceRoomSlug.MatchString(tag[1]):
+				hasRoom = true
 			case len(tag) == 1 && tag[0] == "left":
+			case len(tag) == 1 && tag[0] == "typing":
+				typing = true
 			default:
-				return true, "invalid: presence events only allow a \"t\" tag with a room name and/or a \"left\" tag"
+				return true, "invalid: presence events only allow a \"t\" tag with a room name and/or \"left\" / \"typing\" tags"
 			}
+		}
+		if typing && !hasRoom {
+			return true, "invalid: a \"typing\" presence event needs the \"t\" tag of the room being typed in"
 		}
 
 		skew := int64(event.CreatedAt) - int64(nostr.Now())

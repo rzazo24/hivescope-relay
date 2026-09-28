@@ -25,6 +25,7 @@ func TestPresencePolicy_AcceptsHeartbeatsFromLinkedPubkeys(t *testing.T) {
 		"en una sala":          {{"t", "general"}},
 		"en la lista de salas": {},
 		"saliendo":             {{"t", "general"}, {"left"}},
+		"escribiendo":          {{"t", "general"}, {"typing"}},
 	} {
 		if reject, msg := policy(context.Background(), presenceEvent("ana", tags, nostr.Now())); reject {
 			t.Errorf("%s: debería aceptarse, rechazado: %s", name, msg)
@@ -47,6 +48,8 @@ func TestPresencePolicy_RejectsMalformedEvents(t *testing.T) {
 		"sala inválida":       presenceEvent("ana", nostr.Tags{{"t", "Con Espacios"}}, nostr.Now()),
 		"sala vacía":          presenceEvent("ana", nostr.Tags{{"t", ""}}, nostr.Now()),
 		"t con valores extra": presenceEvent("ana", nostr.Tags{{"t", "general", "extra"}}, nostr.Now()),
+		"typing sin sala":     presenceEvent("ana", nostr.Tags{{"typing"}}, nostr.Now()),
+		"typing con valor":    presenceEvent("ana", nostr.Tags{{"t", "general"}, {"typing", "x"}}, nostr.Now()),
 		"muy antiguo":         presenceEvent("ana", nil, nostr.Now()-3600),
 		"del futuro":          presenceEvent("ana", nil, nostr.Now()+3600),
 	}
