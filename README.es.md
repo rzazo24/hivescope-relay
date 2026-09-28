@@ -30,35 +30,19 @@ para dar soporte al chat de HiveScope.
 ## Caducidad de salas y limpieza
 
 Las salas no son permanentes: todo evento de metadatos de sala lleva una
-`expiration` NIP-40, y khatru lo borra solo una vez que pasa esa fecha —sin
-código propio para esa parte, viene incluido en la librería. Cualquier
-actualización de una sala (renombrarla, delegar admin, o simplemente
-volver a guardarla sin cambios) publica una `expiration` nueva, que es como
-se "renueva" una sala — no hay una acción de renovar aparte.
+`expiration` NIP-40. El relé la aplica por su cuenta (`internal/roomsweep`,
+al arrancar y cada 5 minutos) en vez de fiarse del barrido interno de
+khatru, que resultó poco fiable. Cualquier actualización de una sala
+(renombrarla, delegar admin, o simplemente volver a guardarla sin cambios)
+publica una `expiration` nueva, que es como se "renueva" — no hay una acción
+de renovar aparte.
 
-Que una sala desaparezca no deja su historial de chat suelto: un segundo
-barrido de fondo (`internal/roomsweep`, también cada hora) borra los
-mensajes `kind:9` de una sala en cuanto su evento de metadatos ya no
-existe, haya expirado o se haya borrado a mano. Solo comprueba si la sala
-existe ahora mismo, no por qué dejó de existir ni cuándo se envió cada
-mensaje — así que una sala que se sigue renovando nunca pierde mensajes
-por quedar desincronizada con su propia vigencia.
-
-Además tiene límite de velocidad (rate limiting) por IP, usando el paquete
-[`policies`](https://github.com/fiatjaf/khatru/tree/master/policies) que ya
-trae khatru: las conexiones nuevas, los eventos publicados y los filtros
-`REQ` tienen cada uno su propio límite (los números exactos están en las
-llamadas `khatrupolicies.*RateLimiter` de `main.go`). El límite de eventos
-corre *primero*, antes que las tres políticas de arriba — así, una oleada de
-intentos falsos de `hive-link` se frena antes de disparar una llamada real
-a la API de Hive por cada uno.
-
-Una cosa que este relé **no** restringe, para tenerla en cuenta: leer
-(suscribirse vía `REQ`) no tiene ningún control de acceso — cualquiera puede
-consultar todo lo que hay guardado, sin privacidad por sala.
-
-El detalle de cada regla está documentado como comentario en el archivo de
-la política correspondiente, en `internal/policies/`.
+El mismo barrido mantiene el almacenamiento coherente: borra las filas
+viejas de una sala que dejan otros pubkeys (cada navegador tiene el suyo, así
+que editar desde otro dispositivo dejaría viva la fila anterior) y borra los
+mensajes `kind:9` de una sala cuando ya no existe. Solo comprueba si la sala
+existe ahora mismo, no por qué ni cuándo se envió cada mensaje, así que una
+sala que se sigue renovando nunca pierde mensajes.
 
 ## Estructura del proyecto
 

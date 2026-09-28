@@ -27,16 +27,14 @@ const RoomMetaDTagPrefix = "room:"
 //  1. El nombre de sala (lo que sigue a "room:" en el tag "d") no puede estar
 //     vacío, y deben estar presentes "name", un "admin" con forma de pubkey
 //     nostr válido (64 caracteres hex) y una "expiration" (NIP-40) con forma
-//     de timestamp unix futuro. khatru ya trae soporte nativo de NIP-40 (ver
-//     su expirationManager): borra solo, sin código nuestro, cualquier
-//     evento una vez pasado su "expiration" -- por eso toda sala tiene que
-//     llevar uno, para que las abandonadas se limpien solas. Como el evento
-//     de metadatos es parametrizado reemplazable, cualquier actualización
-//     (renombrar, delegar admin) republica un "expiration" nuevo y así
-//     "renueva" la sala; no hay un botón de renovar aparte, es un efecto
-//     secundario de editar. internal/roomsweep además borra los mensajes de
-//     una sala una vez que su evento de metadatos ya no existe (por
-//     expiración o por borrado manual) -- ver ese paquete para el detalle.
+//     de timestamp unix futuro. La caducidad la aplica internal/roomsweep (no
+//     el barrido NIP-40 de khatru, que en producción dejó una sala caducada
+//     20 h sin borrar): toda sala lleva una para que las abandonadas se
+//     limpien solas. Como el evento de metadatos es parametrizado
+//     reemplazable, cualquier actualización (renombrar, delegar admin)
+//     republica un "expiration" nuevo y así "renueva" la sala; no hay un
+//     botón de renovar aparte. roomsweep además borra las filas viejas que
+//     dejan otros pubkeys y los mensajes de una sala que ya no existe.
 //  2. El pubkey que firma el evento debe tener ya una vinculación hive
 //     verificada (mismo requisito que para publicar mensajes de chat): solo
 //     cuentas hive vinculadas pueden crear o administrar salas.

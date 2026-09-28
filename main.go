@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fiatjaf/eventstore/sqlite3"
 	"github.com/fiatjaf/khatru"
 	khatrupolicies "github.com/fiatjaf/khatru/policies"
+	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/rzazo24/hivescope-relay/internal/hiveapi"
 	"github.com/rzazo24/hivescope-relay/internal/policies"
@@ -77,14 +79,28 @@ func main() {
 		khatrupolicies.ConnectionRateLimiter(10, time.Minute, 30),
 	)
 
-	// Borra los mensajes de una sala una vez que su evento de metadatos ya
-	// no existe (expirado vía NIP-40 -- que khatru ya borra solo -- o
-	// borrado a mano). Ver internal/roomsweep para el porqué de este diseño.
-	go roomsweep.Start(context.Background(), db.QueryEvents, db.DeleteEvent, time.Hour, func(deleted int, err error) {
+	// Tras aceptar una publicación de sala, borra las filas más viejas de esa
+	// misma sala que quedaron de otros pubkeys (el reemplazo NIP-33 es por
+	// autor) -- ver internal/roomsweep. Se registra DESPUÉS de db.ReplaceEvent
+	// para que corra cuando ya está guardada la nueva.
+	relay.ReplaceEvent = append(relay.ReplaceEvent, func(ctx context.Context, evt *nostr.Event) error {
+		if evt.Kind == policies.AppDataKind && strings.HasPrefix(evt.Tags.GetD(), policies.RoomMetaDTagPrefix) {
+			if n, err := roomsweep.PruneSuperseded(ctx, db.QueryEvents, db.DeleteEvent, evt.Tags.GetD()); err != nil {
+				fmt.Printf("roomsweep: error limpiando filas viejas de %q: %v\n", evt.Tags.GetD(), err)
+			} else if n > 0 {
+				fmt.Printf("roomsweep: %d fila(s) vieja(s) de %q borrada(s)\n", n, evt.Tags.GetD())
+			}
+		}
+		return nil
+	})
+
+	// Barrido al arrancar y cada 5 minutos: filas de sala superadas, salas
+	// caducadas y mensajes huérfanos. Ver internal/roomsweep.
+	go roomsweep.Start(context.Background(), db.QueryEvents, db.DeleteEvent, 5*time.Minute, func(r roomsweep.Result, err error) {
 		if err != nil {
 			fmt.Printf("roomsweep: error en el barrido: %v\n", err)
-		} else if deleted > 0 {
-			fmt.Printf("roomsweep: %d mensaje(s) huérfano(s) borrado(s)\n", deleted)
+		} else if r.Superseded+r.Expired+r.Messages > 0 {
+			fmt.Printf("roomsweep: %d fila(s) superada(s), %d sala(s) caducada(s), %d mensaje(s) huérfano(s) borrado(s)\n", r.Superseded, r.Expired, r.Messages)
 		}
 	})
 

@@ -30,34 +30,18 @@ HiveScope chat.
 ## Room expiration and cleanup
 
 Rooms aren't permanent: every room-metadata event carries a NIP-40
-`expiration`, and khatru deletes it automatically once that time passes —
-no custom code needed for that part, it's built into the library. Any
-update to a room (rename, delegating admin, or just re-saving it unchanged)
-publishes a fresh `expiration`, which is how a room gets "renewed" — there's
-no separate renew action.
+`expiration`. The relay enforces it itself (`internal/roomsweep`, at startup
+and every 5 minutes) rather than trusting khatru's built-in sweep, which
+proved unreliable. Any update to a room (rename, delegating admin, or just
+re-saving it unchanged) publishes a fresh `expiration`, which is how a room
+gets "renewed" — there's no separate renew action.
 
-A room disappearing doesn't leave its chat history behind: a second
-background sweep (`internal/roomsweep`, also hourly) deletes a room's
-`kind:9` messages once that room's metadata event is gone, whether it
-expired or was deleted manually. It only checks whether the room currently
-exists, not why it stopped existing or when any given message was sent —
-so a room that keeps getting renewed never loses messages out of sync with
-its own lifetime.
-
-It's also rate-limited per IP, using khatru's built-in
-[`policies`](https://github.com/fiatjaf/khatru/tree/master/policies)
-package: new connections, published events, and `REQ` filters each have
-their own limit (see the `khatrupolicies.*RateLimiter` calls in `main.go`
-for the exact numbers). The event limiter runs *first*, before any of the
-three policies above — so a flood of fake `hive-link` attempts gets stopped
-before it can trigger a live call to the Hive API for each one.
-
-One thing this relay does **not** restrict, worth keeping in mind: reading
-(subscribing via `REQ`) has no access control — anyone can query anything
-that's stored, with no per-room privacy.
-
-Each rule is documented as a comment in its corresponding policy file, under
-`internal/policies/`.
+The same sweep keeps storage consistent: it deletes stale room rows left by
+other pubkeys (each browser has its own, so editing from another device
+would otherwise leave an old row alive) and deletes a room's `kind:9`
+messages once the room no longer exists. It only checks whether the room
+currently exists, not why or when any message was sent, so a room that keeps
+getting renewed never loses messages.
 
 ## Project structure
 

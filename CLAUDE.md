@@ -118,29 +118,40 @@ tag.
 `khatrupolicies.FilterIPRateLimiter` / `ConnectionRateLimiter` are wired the
 same way onto `RejectFilter` / `RejectConnection`.
 
-**Room expiration and cascading message cleanup**: room-metadata events
-must carry a NIP-40 `expiration` tag (validated in `NewRoomMetaPolicy`,
-required, must be a future unix timestamp) — khatru already implements
-NIP-40 natively (`expirationManager` in the khatru module itself, an
-hourly sweep, no code of ours involved) and deletes the event once it
-passes, no extra wiring needed for that half. Since the metadata event is
-NIP-33 replaceable, any update (rename, delegate admin, or the frontend's
-"edit" action even with no real change) republishes a fresh `expiration`
-further out — that's the entire "renew a room" mechanism, there's no
-separate renew endpoint or button.
+**Room expiration and cleanup**: room-metadata events must carry a NIP-40
+`expiration` tag (validated in `NewRoomMetaPolicy`, required, future unix
+timestamp). Since the metadata event is NIP-33 replaceable, any update
+(rename, delegate admin, or the frontend's "edit" even with no real change)
+republishes a fresh `expiration` — that's the whole "renew a room"
+mechanism, there's no renew endpoint or button.
 
-That only handles the room's own listing disappearing, not its chat
-history. `internal/roomsweep` is a **second**, separate background sweep
-(also hourly, started from `main.go` next to khatru's own) that deletes
-`kind:9` chat messages once the room they belong to (matched by the
-message's `t` tag against a room's `d` tag, minus the `room:` prefix) no
-longer has a live metadata event — for any reason, expired or manually
-NIP-09-deleted, roomsweep doesn't care which. This is deliberately blind to
-*why* a room disappeared and to any specific expiration timestamp: it only
-ever asks "does this room currently exist," so a renewed room's messages
-are never at risk of being cleaned up out of sync with the room itself,
-however many times it's been renewed or whenever each individual message
-was sent.
+**Don't rely on khatru's own NIP-40 sweep.** It exists (`expirationManager`,
+hourly) but in production it left a room 20 h past its expiration
+undeleted; it also only tracks what was published since the last start and
+its countdown resets on every deploy. `internal/roomsweep` enforces
+expiration itself instead, at startup and every 5 minutes, and does three
+things in one pass over the stored events:
+
+1. **Prunes superseded room rows.** NIP-33 replacement is scoped to
+   `(pubkey, kind, d)` and every browser/device has its own Nostr pubkey, so
+   editing a room from another device leaves *two* rows for the same `d`.
+   Only the newest (`created_at`, higher id on a tie) is the room; the rest
+   are deleted. Without this, an old row — e.g. one from before
+   `expiration` existed — outlived every later edit and kept the room alive
+   forever (this was the reported bug: "I set a duration on General and it
+   never got deleted"). `main.go` also calls `PruneSuperseded` right after
+   each accepted room publish (a second `ReplaceEvent` hook registered after
+   `db.ReplaceEvent`) so the cleanup is immediate, not up to 5 minutes late.
+2. **Deletes the newest row if its `expiration` has passed.** Rooms with no
+   `expiration` at all (created before the tag was required) never expire
+   until someone edits them.
+3. **Deletes orphaned `kind:9` messages**: those whose `t` tag matches no
+   live room. It's blind to *why* a room vanished and to any timestamp, only
+   "does this room exist now", so a renewed room never loses messages.
+
+Consequence for ownership: since old rows are now deleted, the newest
+publisher is the only row left — same rule `findRoomOwnership` already
+applied, it just no longer has stale rows to ignore.
 
 **Known, intentional gaps** (explicit product decisions made in
 conversation, not oversights — don't "fix" these without asking first):

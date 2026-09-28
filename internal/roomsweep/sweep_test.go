@@ -3,12 +3,15 @@ package roomsweep
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/rzazo24/hivescope-relay/internal/policies"
 )
+
+const now = nostr.Timestamp(1_000_000)
 
 func fakeQueryEvents(events []*nostr.Event, err error) QueryEventsFunc {
 	return func(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
@@ -24,9 +27,9 @@ func fakeQueryEvents(events []*nostr.Event, err error) QueryEventsFunc {
 	}
 }
 
-func fakeDeleteEvent(deleted *[]*nostr.Event) DeleteEventFunc {
+func fakeDeleteEvent(deleted *[]string) DeleteEventFunc {
 	return func(ctx context.Context, evt *nostr.Event) error {
-		*deleted = append(*deleted, evt)
+		*deleted = append(*deleted, evt.ID)
 		return nil
 	}
 }
@@ -35,101 +38,175 @@ func chatMessage(id, room string) *nostr.Event {
 	return &nostr.Event{ID: id, Kind: policies.ChatMessageKind, Tags: nostr.Tags{{"t", room}}}
 }
 
-func roomMeta(dTag string) *nostr.Event {
-	return &nostr.Event{Kind: policies.AppDataKind, Tags: nostr.Tags{{"d", dTag}}}
+// roomRow arma una fila de metadatos de sala; exp == 0 significa "sin expiration".
+func roomRow(id, slug, pubkey string, createdAt nostr.Timestamp, exp nostr.Timestamp) *nostr.Event {
+	tags := nostr.Tags{{"d", "room:" + slug}}
+	if exp != 0 {
+		tags = append(tags, nostr.Tag{"expiration", strconv.FormatInt(int64(exp), 10)})
+	}
+	return &nostr.Event{ID: id, Kind: policies.AppDataKind, PubKey: pubkey, CreatedAt: createdAt, Tags: tags}
 }
 
-func TestSweepOnce_DeletesMessagesForRoomsThatNoLongerExist(t *testing.T) {
-	events := []*nostr.Event{
-		roomMeta("room:general"),
-		chatMessage("keep", "general"),
-		chatMessage("orphan", "borrada"), // no hay ningún room:borrada guardado
-	}
-	var deleted []*nostr.Event
-	n, err := SweepOnce(context.Background(), fakeQueryEvents(events, nil), fakeDeleteEvent(&deleted))
+func sweep(t *testing.T, events []*nostr.Event) (Result, []string) {
+	t.Helper()
+	var deleted []string
+	res, err := sweepAt(context.Background(), fakeQueryEvents(events, nil), fakeDeleteEvent(&deleted), now)
 	if err != nil {
 		t.Fatalf("no debería fallar: %v", err)
 	}
-	if n != 1 || len(deleted) != 1 || deleted[0].ID != "orphan" {
+	return res, deleted
+}
+
+func TestSweep_DeletesMessagesForRoomsThatNoLongerExist(t *testing.T) {
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("r", "general", "a", 10, now+100),
+		chatMessage("keep", "general"),
+		chatMessage("orphan", "borrada"),
+	})
+	if res.Messages != 1 || len(deleted) != 1 || deleted[0] != "orphan" {
 		t.Fatalf("debería borrar solo el mensaje huérfano, borró: %v", deleted)
 	}
 }
 
-func TestSweepOnce_KeepsMessagesWhenRoomStillExists(t *testing.T) {
-	events := []*nostr.Event{
-		roomMeta("room:general"),
+func TestSweep_KeepsEverythingWhileRoomIsAlive(t *testing.T) {
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("r", "general", "a", 10, now+100),
 		chatMessage("a", "general"),
 		chatMessage("b", "general"),
-	}
-	var deleted []*nostr.Event
-	n, err := SweepOnce(context.Background(), fakeQueryEvents(events, nil), fakeDeleteEvent(&deleted))
-	if err != nil {
-		t.Fatalf("no debería fallar: %v", err)
-	}
-	if n != 0 || len(deleted) != 0 {
-		t.Fatalf("no debería borrar nada mientras la sala siga existiendo, borró: %v", deleted)
+	})
+	if len(deleted) != 0 || res != (Result{}) {
+		t.Fatalf("no debería borrar nada, borró: %v (%+v)", deleted, res)
 	}
 }
 
-func TestSweepOnce_IgnoresMessagesWithoutRoomTag(t *testing.T) {
-	events := []*nostr.Event{
-		{ID: "no-room-tag", Kind: policies.ChatMessageKind, Tags: nostr.Tags{}},
-	}
-	var deleted []*nostr.Event
-	n, err := SweepOnce(context.Background(), fakeQueryEvents(events, nil), fakeDeleteEvent(&deleted))
-	if err != nil {
-		t.Fatalf("no debería fallar: %v", err)
-	}
-	if n != 0 {
-		t.Fatalf("un mensaje sin tag \"t\" no debería intentar borrarse, borró %d", n)
+func TestSweep_RoomWithoutExpirationIsImmortal(t *testing.T) {
+	// salas creadas antes de que existiera "expiration"
+	_, deleted := sweep(t, []*nostr.Event{roomRow("r", "vieja", "a", 10, 0), chatMessage("m", "vieja")})
+	if len(deleted) != 0 {
+		t.Fatalf("una sala sin expiration no debería borrarse, borró: %v", deleted)
 	}
 }
 
-func TestSweepOnce_IgnoresNonRoomAppData(t *testing.T) {
-	// Un evento kind:30078 que no es de sala (por ejemplo hive-link) no
-	// cuenta como "sala viva" para ningún "t".
-	events := []*nostr.Event{
-		{Kind: policies.AppDataKind, Tags: nostr.Tags{{"d", "hive-link"}}},
+func TestSweep_DeletesExpiredRoomAndItsMessages(t *testing.T) {
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("r", "general", "a", 10, now-1),
+		chatMessage("m", "general"),
+	})
+	if res.Expired != 1 || res.Messages != 1 || len(deleted) != 2 {
+		t.Fatalf("debería borrar la sala caducada y su mensaje, borró: %v (%+v)", deleted, res)
+	}
+}
+
+func TestSweep_ExpirationExactlyNowCountsAsExpired(t *testing.T) {
+	res, _ := sweep(t, []*nostr.Event{roomRow("r", "general", "a", 10, now)})
+	if res.Expired != 1 {
+		t.Fatalf("expiration == ahora ya debería contar como caducada: %+v", res)
+	}
+}
+
+func TestSweep_PrunesSupersededRowsFromOtherPubkeys(t *testing.T) {
+	// El caso real: la fila original (otro pubkey) no tiene expiration; la
+	// edición desde otro navegador publicó una fila nueva que sí. La vieja
+	// tiene que desaparecer o mantendría viva la sala para siempre.
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("old", "general", "a", 10, 0),
+		roomRow("new", "general", "b", 20, now+100),
+		chatMessage("m", "general"),
+	})
+	if res.Superseded != 1 || len(deleted) != 1 || deleted[0] != "old" {
+		t.Fatalf("debería borrar solo la fila vieja, borró: %v (%+v)", deleted, res)
+	}
+}
+
+func TestSweep_ExpiredNewestRowKillsTheRoomEvenIfAnOlderRowNeverExpired(t *testing.T) {
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("old", "general", "a", 10, 0),
+		roomRow("new", "general", "b", 20, now-5),
+		chatMessage("m", "general"),
+	})
+	if res.Superseded != 1 || res.Expired != 1 || res.Messages != 1 || len(deleted) != 3 {
+		t.Fatalf("la última edición manda: sala y mensajes deberían borrarse, borró: %v (%+v)", deleted, res)
+	}
+}
+
+func TestSweep_RenewedRoomKeepsItsMessages(t *testing.T) {
+	// Renovar = publicar una fila más nueva con expiration más lejana.
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("old", "general", "a", 10, now-5), // ya caducada, pero superada
+		roomRow("new", "general", "a", 20, now+1000),
+		chatMessage("m", "general"),
+	})
+	if res.Expired != 0 || res.Messages != 0 {
+		t.Fatalf("una sala renovada no debería perder nada más que la fila vieja, borró: %v (%+v)", deleted, res)
+	}
+}
+
+func TestSweep_TieOnCreatedAtKeepsHigherID(t *testing.T) {
+	_, deleted := sweep(t, []*nostr.Event{
+		roomRow("aa", "general", "a", 10, now+100),
+		roomRow("bb", "general", "b", 10, now+100),
+	})
+	if len(deleted) != 1 || deleted[0] != "aa" {
+		t.Fatalf("en empate debería quedarse el id mayor, borró: %v", deleted)
+	}
+}
+
+func TestSweep_IgnoresMessagesWithoutRoomTag(t *testing.T) {
+	res, _ := sweep(t, []*nostr.Event{{ID: "x", Kind: policies.ChatMessageKind, Tags: nostr.Tags{}}})
+	if res.Messages != 0 {
+		t.Fatalf("un mensaje sin tag \"t\" no debería borrarse")
+	}
+}
+
+func TestSweep_IgnoresNonRoomAppData(t *testing.T) {
+	// hive-link (mismo kind) ni cuenta como sala viva ni se toca.
+	res, deleted := sweep(t, []*nostr.Event{
+		{ID: "link", Kind: policies.AppDataKind, Tags: nostr.Tags{{"d", "hive-link"}}},
 		chatMessage("orphan", "hive-link"),
-	}
-	var deleted []*nostr.Event
-	n, err := SweepOnce(context.Background(), fakeQueryEvents(events, nil), fakeDeleteEvent(&deleted))
-	if err != nil {
-		t.Fatalf("no debería fallar: %v", err)
-	}
-	if n != 1 {
-		t.Fatalf("debería borrar el mensaje, un evento hive-link no cuenta como sala")
+	})
+	if res.Messages != 1 || len(deleted) != 1 || deleted[0] != "orphan" {
+		t.Fatalf("solo debería borrar el mensaje, borró: %v", deleted)
 	}
 }
 
-func TestSweepOnce_PropagatesRoomQueryError(t *testing.T) {
-	_, err := SweepOnce(context.Background(), fakeQueryEvents(nil, errors.New("db down")), fakeDeleteEvent(&[]*nostr.Event{}))
+func TestSweep_PropagatesQueryError(t *testing.T) {
+	_, err := sweepAt(context.Background(), fakeQueryEvents(nil, errors.New("db down")), fakeDeleteEvent(&[]string{}), now)
 	if err == nil {
-		t.Fatal("debería propagar el error de la consulta de salas")
+		t.Fatal("debería propagar el error de la consulta")
 	}
 }
 
-func TestSweepOnce_ContinuesAfterAFailedDelete(t *testing.T) {
-	events := []*nostr.Event{
-		chatMessage("a", "borrada"),
-		chatMessage("b", "borrada"),
-	}
+func TestSweep_ContinuesAfterAFailedDelete(t *testing.T) {
 	calls := 0
-	deleteEvent := func(ctx context.Context, evt *nostr.Event) error {
+	del := func(ctx context.Context, evt *nostr.Event) error {
 		calls++
 		if evt.ID == "a" {
 			return errors.New("delete failed")
 		}
 		return nil
 	}
-	n, err := SweepOnce(context.Background(), fakeQueryEvents(events, nil), deleteEvent)
-	if err != nil {
-		t.Fatalf("no debería fallar el barrido entero por un borrado puntual fallido: %v", err)
+	res, err := sweepAt(context.Background(), fakeQueryEvents([]*nostr.Event{chatMessage("a", "x"), chatMessage("b", "x")}, nil), del, now)
+	if err != nil || calls != 2 || res.Messages != 1 {
+		t.Fatalf("debería intentar los dos y contar solo el que funcionó: calls=%d res=%+v err=%v", calls, res, err)
 	}
-	if calls != 2 {
-		t.Fatalf("debería intentar borrar los dos mensajes, intentó %d", calls)
+}
+
+func TestPruneSuperseded_KeepsOnlyNewestRowOfThatRoom(t *testing.T) {
+	var deleted []string
+	n, err := PruneSuperseded(context.Background(), fakeQueryEvents([]*nostr.Event{
+		roomRow("old", "general", "a", 10, 0),
+		roomRow("new", "general", "b", 20, now+100),
+		roomRow("other", "otra", "c", 5, 0), // otra sala: no se toca
+	}, nil), fakeDeleteEvent(&deleted), "room:general")
+	if err != nil || n != 1 || len(deleted) != 1 || deleted[0] != "old" {
+		t.Fatalf("debería borrar solo la vieja de esa sala: n=%d deleted=%v err=%v", n, deleted, err)
 	}
-	if n != 1 {
-		t.Fatalf("debería contar solo el borrado que sí funcionó, contó %d", n)
+}
+
+func TestPruneSuperseded_NoopWithASingleRow(t *testing.T) {
+	var deleted []string
+	n, _ := PruneSuperseded(context.Background(), fakeQueryEvents([]*nostr.Event{roomRow("r", "general", "a", 10, 0)}, nil), fakeDeleteEvent(&deleted), "room:general")
+	if n != 0 || len(deleted) != 0 {
+		t.Fatalf("con una sola fila no hay nada que podar")
 	}
 }
