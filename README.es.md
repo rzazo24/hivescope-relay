@@ -22,7 +22,7 @@ antes de guardarlos.
 | Mensaje de chat | `9` | Requiere el tag `t` (sala) y que el pubkey emisor tenga ya un evento de vinculación válido guardado. |
 | Metadatos de sala | `30078`, `d=room:<sala>` | Requiere `name`, un `admin` (pubkey nostr válido) y una `expiration` (NIP-40, timestamp unix futuro), y que el pubkey emisor esté vinculado a Hive. La primera cuenta vinculada que publica un nombre de sala pasa a ser su dueña; a partir de ahí, solo la dueña actual de la sala o el pubkey indicado en su tag `admin` —o cualquier otro pubkey vinculado a la misma cuenta Hive que uno de ellos, es decir, tus otros dispositivos— pueden seguir publicando actualizaciones (renombrarla, o delegar la administración en otra cuenta). |
 
-Cualquier evento que no encaje en una de estas tres formas —cualquier otro
+Además de estos, el relé acepta borrados NIP-09 (kind `5`) y latidos de presencia efímeros (kind `20078`, ver más abajo). Cualquier evento que no encaje en una de estas formas —cualquier otro
 kind, o un evento `30078` con un `d` distinto— se rechaza directamente. Este
 relé no está pensado como un relé Nostr de propósito general: existe solo
 para dar soporte al chat de HiveScope.
@@ -226,10 +226,10 @@ hivescope-relay-link:<pubkey_nostr_del_evento>
 exacto — es un contrato entre el frontend y el relé, no se puede cambiar de
 un lado sin el otro.
 
-## Licencia
-
-[MIT](LICENSE)
-
 ## Chequeo de salud
 
 `scripts/healthcheck.sh` (lanzado por cron cada 2 minutos) pide por HTTPS el chat y el documento NIP-11 del relé; tras dos fallos seguidos reinicia `caddy` (si cae el chat) o `relay` (si solo cae el relé), como mucho una vez cada 10 minutos, y deja constancia en `~/backups/hivescope-relay/healthcheck.log`. Solo se recupera solo: no avisa a nadie y no sirve si cae la máquina entera.
+
+## Licencia
+
+[MIT](LICENSE)

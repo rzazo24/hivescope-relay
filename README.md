@@ -22,7 +22,7 @@ before storing them.
 | Chat message | `9` | Requires the `t` tag (room) and that the sender pubkey already has a valid, saved link event. |
 | Room metadata | `30078`, `d=room:<room>` | Requires `name`, an `admin` (valid nostr pubkey), and an `expiration` (NIP-40, a future unix timestamp), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its owner; from then on, only that room's current owner or the pubkey named in its `admin` tag — or any other pubkey linked to the same Hive account as either of them (i.e. your other devices) — may publish further updates (rename, or delegate admin to another account). |
 
-Any event that doesn't match one of these three shapes — any other kind, or
+Besides these, the relay accepts NIP-09 deletions (kind `5`) and ephemeral presence heartbeats (kind `20078`, see below). Any event that doesn't match one of these shapes — any other kind, or
 a `30078` event with a different `d` — is rejected outright. This relay is
 not meant to be a general-purpose Nostr relay; it exists only to back the
 HiveScope chat.
@@ -221,10 +221,10 @@ hivescope-relay-link:<nostr_pubkey_of_the_event>
 details — it's a contract between the frontend and the relay, and can't be
 changed on one side without the other.
 
-## License
-
-[MIT](LICENSE)
-
 ## Self-healing check
 
 `scripts/healthcheck.sh` (run from cron every 2 minutes) requests the chat and the relay's NIP-11 document over HTTPS; after two consecutive failures it restarts `caddy` (chat down) or `relay` (only the relay down), at most once every 10 minutes, and logs to `~/backups/hivescope-relay/healthcheck.log`. It only self-recovers: it notifies nobody and can't help if the machine itself is down.
+
+## License
+
+[MIT](LICENSE)
