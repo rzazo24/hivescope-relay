@@ -3,6 +3,7 @@ package policies
 import (
 	"context"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -16,6 +17,11 @@ const ChatMessageKind = 9
 // reutilizar el propio almacenamiento del relé sin acoplar esta política a
 // una implementación de base de datos específica.
 type QueryEventsFunc func(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error)
+
+// MaxChatMessageLength es el máximo de caracteres (runas) del contenido de un
+// mensaje de chat. El frontend lo replica en su campo de texto
+// (MAX_MESSAGE_LENGTH); si cambias uno, cambia el otro.
+const MaxChatMessageLength = 2000
 
 // NewChatMessagePolicy construye una política khatru RejectEvent para
 // mensajes de chat (kind 9):
@@ -41,6 +47,10 @@ func NewChatMessagePolicy(queryEvents QueryEventsFunc) func(ctx context.Context,
 
 		if event.Tags.Find("t").Value() == "" {
 			return true, "invalid: missing \"t\" tag with the room name"
+		}
+
+		if n := utf8.RuneCountInString(event.Content); n > MaxChatMessageLength {
+			return true, fmt.Sprintf("invalid: message too long (%d characters, the maximum is %d)", n, MaxChatMessageLength)
 		}
 
 		linked, err := hasVerifiedHiveLink(ctx, queryEvents, event.PubKey)

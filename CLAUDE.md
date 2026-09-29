@@ -68,7 +68,7 @@ is load-bearing, not incidental:
    account's actual **posting** key, fetched live via `internal/hiveapi`
    (cached 5 min per account) and checked in `internal/hivecrypto`.
 3. `NewChatMessagePolicy` (`chatmessage.go`) — validates `kind:9` chat
-   messages. Critically, it does **not** re-verify any Hive signature: it
+   messages (content capped at `MaxChatMessageLength` = 2000 *characters* — runes, not bytes; the frontend mirrors it as `MAX_MESSAGE_LENGTH`). Critically, it does **not** re-verify any Hive signature: it
    just queries the relay's own SQLite store (`db.QueryEvents`, passed in
    from `main.go`) for a previously-*accepted* `hive-link` event from the
    same pubkey. There is no separate "verified identities" table — the

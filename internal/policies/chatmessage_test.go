@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -111,5 +112,27 @@ func TestChatMessagePolicy_PropagatesQueryError(t *testing.T) {
 	}
 	if msg == "" {
 		t.Fatal("se esperaba un mensaje de error")
+	}
+}
+
+func TestChatMessagePolicy_EnforcesMaxLength(t *testing.T) {
+	linkEvent := &nostr.Event{
+		Kind:   HiveLinkKind,
+		PubKey: "abc",
+		Tags:   nostr.Tags{{"d", HiveLinkDTag}, {"hive_account", "abc"}},
+	}
+	policy := NewChatMessagePolicy(fakeQueryEvents([]*nostr.Event{linkEvent}, nil))
+	msg := func(content string) *nostr.Event {
+		return &nostr.Event{Kind: ChatMessageKind, PubKey: "abc", Tags: nostr.Tags{{"t", "sala"}}, Content: content}
+	}
+	if reject, m := policy(context.Background(), msg(strings.Repeat("a", MaxChatMessageLength))); reject {
+		t.Fatalf("el máximo exacto debería aceptarse: %s", m)
+	}
+	// se cuentan caracteres, no bytes: 2000 emojis (4 bytes cada uno) caben
+	if reject, m := policy(context.Background(), msg(strings.Repeat("😀", MaxChatMessageLength))); reject {
+		t.Fatalf("2000 emojis deberían aceptarse: %s", m)
+	}
+	if reject, _ := policy(context.Background(), msg(strings.Repeat("a", MaxChatMessageLength+1))); !reject {
+		t.Fatal("un carácter de más debería rechazarse")
 	}
 }
