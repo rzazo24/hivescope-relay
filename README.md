@@ -20,9 +20,10 @@ before storing them.
 |---|---|---|
 | Hive↔Nostr identity link | `30078`, `d=hive-link` | `hive_sig` must be a real signature, made with the **posting** key of the `hive_account`, over the message `hivescope-relay-link:<nostr_pubkey>`. It's verified against the real posting key, queried live from a Hive node. |
 | Chat message | `9` | Requires the `t` tag (room), at most 2000 characters of content, and that the sender pubkey already has a valid, saved link event. |
+| Reaction | `7` | One of a closed list of emojis (👍 ❤️ 😂 🎉 😮 😢) on an existing chat message, with its `e`/`p`/`t` tags matching it; the sender must be linked and can't repeat the same emoji on the same message. |
 | Room metadata | `30078`, `d=room:<room>` | Requires `name`, an `admin` (valid nostr pubkey), and an `expiration` (NIP-40, a future unix timestamp), and that the sender pubkey is linked to Hive. The first linked account to publish a given room name becomes its owner; from then on, only that room's current owner or the pubkey named in its `admin` tag — or any other pubkey linked to the same Hive account as either of them (i.e. your other devices) — may publish further updates (rename, or delegate admin to another account). |
 
-Besides these, the relay accepts NIP-09 deletions (kind `5`) and ephemeral presence heartbeats (kind `20078`, see below). Any event that doesn't match one of these shapes — any other kind, or
+Besides these (reactions are a fourth shape), the relay accepts NIP-09 deletions (kind `5`) and ephemeral presence heartbeats (kind `20078`, see below). Any event that doesn't match one of these shapes — any other kind, or
 a `30078` event with a different `d` — is rejected outright. This relay is
 not meant to be a general-purpose Nostr relay; it exists only to back the
 HiveScope chat.

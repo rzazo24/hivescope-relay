@@ -68,10 +68,17 @@ func main() {
 		// para no gastar el del chat ni el de otras personas tras la misma IP.
 		policies.SplitRateLimit(
 			khatrupolicies.EventIPRateLimiter(30, time.Minute, 60),
-			khatrupolicies.EventIPRateLimiter(5, time.Minute, 20),
+			// Las reacciones también tienen su propio cupo: son más frecuentes
+			// que los mensajes y no deben gastar el del chat.
+			policies.SplitRateLimitKind(
+				policies.ReactionKind,
+				khatrupolicies.EventIPRateLimiter(20, time.Minute, 40),
+				khatrupolicies.EventIPRateLimiter(5, time.Minute, 20),
+			),
 		),
 		policies.NewHiveLinkPolicy(hiveClient),
 		policies.NewChatMessagePolicy(db.QueryEvents),
+		policies.NewReactionPolicy(db.QueryEvents),
 		policies.NewRoomMetaPolicy(db.QueryEvents, superadminHiveAccount),
 		policies.NewPresencePolicy(db.QueryEvents),
 		policies.NewAllowedEventsPolicy(),
@@ -109,8 +116,8 @@ func main() {
 	go roomsweep.Start(context.Background(), db.QueryEvents, db.DeleteEvent, 5*time.Minute, func(r roomsweep.Result, err error) {
 		if err != nil {
 			fmt.Printf("roomsweep: error en el barrido: %v\n", err)
-		} else if r.Superseded+r.Expired+r.Messages > 0 {
-			fmt.Printf("roomsweep: %d fila(s) superada(s), %d sala(s) caducada(s), %d mensaje(s) huérfano(s) borrado(s)\n", r.Superseded, r.Expired, r.Messages)
+		} else if r.Superseded+r.Expired+r.Messages+r.Reactions > 0 {
+			fmt.Printf("roomsweep: %d fila(s) superada(s), %d sala(s) caducada(s), %d mensaje(s) huérfano(s) y %d reacción(es) borrado(s)\n", r.Superseded, r.Expired, r.Messages, r.Reactions)
 		}
 	})
 

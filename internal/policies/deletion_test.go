@@ -72,3 +72,12 @@ func TestDeletionOutcome_QueryErrorRefuses(t *testing.T) {
 		t.Fatal("ante un error de consulta hay que negar, no permitir")
 	}
 }
+
+func TestDeletionOutcome_AnotherDeviceOfTheSameAccountCanRemoveAReaction(t *testing.T) {
+	events := []*nostr.Event{linkedEventForAccount("movil", "ana"), linkedEventForAccount("pc", "ana")}
+	outcome := NewDeletionOutcome(fakeQueryEvents(events, nil))
+	react := &nostr.Event{Kind: ReactionKind, PubKey: "movil", Content: "👍"}
+	if ok, msg := outcome(context.Background(), react, deletionBy("pc")); !ok {
+		t.Fatalf("debería poder quitar la reacción: %s", msg)
+	}
+}

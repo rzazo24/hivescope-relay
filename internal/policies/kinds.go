@@ -15,3 +15,14 @@ const AppDataKind = 30078
 // distintas con un latido reciente. Un latido con el tag "left" retira la
 // presencia al salir. Ver NewPresencePolicy.
 const PresenceKind = 20078
+
+// ReactionKind es el kind 7 (NIP-25, reacciones). Una reacción es un emoji de
+// una lista cerrada (ReactionEmojis) sobre un mensaje de chat concreto. Quitar
+// una reacción es un borrado NIP-09 de ese evento. Ver NewReactionPolicy.
+const ReactionKind = 7
+
+// ReactionEmojis son los únicos contenidos aceptados en una reacción. Cerrada
+// a propósito: nada de texto libre en un evento que el cliente pinta tal cual.
+// El frontend (REACTION_EMOJIS) usa exactamente los mismos; si cambias uno,
+// cambia el otro.
+var ReactionEmojis = []string{"👍", "❤️", "😂", "🎉", "😮", "😢"}

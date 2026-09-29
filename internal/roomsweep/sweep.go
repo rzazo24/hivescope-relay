@@ -14,6 +14,8 @@
 //     una sala caducada 20 h sin borrar. Este paquete lo aplica por su cuenta.
 //  3. Borra los mensajes de chat (kind 9) huérfanos: los de salas que ya no
 //     tienen una fila vigente.
+//  4. Borra las reacciones (kind 7) huérfanas: las de salas que ya no existen
+//     y las que apuntan a un mensaje que ya no está (borrado por su autor).
 //
 // Nada de esto sabe por qué desapareció una sala ni cuándo se envió cada
 // mensaje: solo compara qué "t" tienen los mensajes contra qué salas siguen
@@ -44,6 +46,7 @@ type Result struct {
 	Superseded int // filas de sala reemplazadas por una más nueva de otro pubkey
 	Expired    int // salas vigentes cuya expiration ya pasó
 	Messages   int // mensajes de salas que ya no existen
+	Reactions  int // reacciones de salas que ya no existen o a mensajes que ya no existen
 }
 
 // Start corre un barrido al arrancar y luego cada interval hasta que ctx se
@@ -113,18 +116,40 @@ func sweepAt(ctx context.Context, queryEvents QueryEventsFunc, deleteEvent Delet
 	if err != nil {
 		return res, err
 	}
+	surviving := map[string]bool{} // ids de mensajes que siguen guardados
 	for ev := range msgs {
 		if ev.Kind != policies.ChatMessageKind {
 			continue
 		}
 		room := ev.Tags.Find("t").Value()
 		if room == "" || live[room] {
+			surviving[ev.ID] = true
 			continue
 		}
 		// un error al borrar un mensaje puntual no aborta el barrido: se
 		// reintenta en el próximo ciclo.
 		if deleteEvent(ctx, ev) == nil {
 			res.Messages++
+		} else {
+			surviving[ev.ID] = true
+		}
+	}
+
+	reactions, err := queryEvents(ctx, nostr.Filter{Kinds: []int{policies.ReactionKind}})
+	if err != nil {
+		return res, err
+	}
+	for ev := range reactions {
+		if ev.Kind != policies.ReactionKind {
+			continue
+		}
+		room := ev.Tags.Find("t").Value()
+		target := ev.Tags.Find("e").Value()
+		if room != "" && live[room] && surviving[target] {
+			continue
+		}
+		if deleteEvent(ctx, ev) == nil {
+			res.Reactions++
 		}
 	}
 

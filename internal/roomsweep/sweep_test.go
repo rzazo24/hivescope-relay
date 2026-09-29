@@ -210,3 +210,37 @@ func TestPruneSuperseded_NoopWithASingleRow(t *testing.T) {
 		t.Fatalf("con una sola fila no hay nada que podar")
 	}
 }
+
+func reactionTo(id, msgID, room string) *nostr.Event {
+	return &nostr.Event{ID: id, Kind: policies.ReactionKind, Tags: nostr.Tags{{"e", msgID}, {"t", room}}}
+}
+
+func TestSweep_DeletesOrphanReactions(t *testing.T) {
+	res, deleted := sweep(t, []*nostr.Event{
+		roomRow("r1", "viva", "p", now-10, now+100),
+		chatMessage("m1", "viva"),
+		reactionTo("ok", "m1", "viva"),
+		reactionTo("sin-mensaje", "borrado", "viva"),  // el mensaje ya no existe
+		reactionTo("sin-sala", "m9", "muerta"),        // la sala ya no existe
+		{ID: "sin-tags", Kind: policies.ReactionKind}, // malformada
+	})
+	if res.Reactions != 3 {
+		t.Fatalf("se esperaban 3 reacciones borradas, hubo %d (%v)", res.Reactions, deleted)
+	}
+	for _, id := range deleted {
+		if id == "ok" {
+			t.Fatal("la reacción válida no debe borrarse")
+		}
+	}
+}
+
+func TestSweep_ReactionsGoWhenTheirRoomExpires(t *testing.T) {
+	res, _ := sweep(t, []*nostr.Event{
+		roomRow("r1", "vieja", "p", now-100, now-1),
+		chatMessage("m1", "vieja"),
+		reactionTo("x", "m1", "vieja"),
+	})
+	if res.Messages != 1 || res.Reactions != 1 {
+		t.Fatalf("mensaje y reacción deberían borrarse con la sala: %+v", res)
+	}
+}

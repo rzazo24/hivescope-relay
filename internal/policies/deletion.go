@@ -16,7 +16,7 @@ import (
 // Reglas:
 //  1. El mismo pubkey que publicó el evento siempre puede borrarlo (es lo que
 //     haría khatru por defecto).
-//  2. Solo para mensajes de chat (kind 9): otro pubkey vinculado a la MISMA
+//  2. Solo para mensajes de chat (kind 9) y reacciones (kind 7): otro pubkey vinculado a la MISMA
 //     cuenta Hive que el autor también puede. Cada navegador/dispositivo
 //     genera su propio pubkey, pero la identidad real es la cuenta Hive (igual
 //     que con la propiedad de las salas, ver sharesHiveAccount).
@@ -30,7 +30,7 @@ func NewDeletionOutcome(queryEvents QueryEventsFunc) func(ctx context.Context, t
 			return true, ""
 		}
 		const denied = "you are not the author of this event"
-		if target.Kind != ChatMessageKind {
+		if target.Kind != ChatMessageKind && target.Kind != ReactionKind {
 			return false, denied
 		}
 

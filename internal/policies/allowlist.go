@@ -12,11 +12,12 @@ import (
 // rechaza cualquier evento que no sea uno de los tres tipos que
 // hivescope-relay conoce: mensajes de chat (kind 9), vinculación hive
 // (kind 30078 d=hive-link) o metadatos de sala (kind 30078 d=room:<sala>);
-// además de los latidos de presencia (kind efímero 20078, ver PresenceKind).
+// además de reacciones (kind 7, ver ReactionKind) y los latidos de presencia
+// (kind efímero 20078, ver PresenceKind).
 //
 // hivescope-relay no es un relé Nostr de propósito general: existe
 // específicamente para el chat de HiveScope, así que cualquier otro tipo de
-// evento (notas, perfiles, reacciones, DMs, lo que sea) se rechaza por
+// evento (notas, perfiles, DMs, lo que sea) se rechaza por
 // defecto en vez de aceptarse silenciosamente. Las políticas específicas de
 // cada tipo (NewChatMessagePolicy, NewHiveLinkPolicy, NewRoomMetaPolicy) ya
 // deciden si aceptan o rechazan un evento válido de su propia forma; esta
@@ -36,7 +37,7 @@ import (
 func NewAllowedEventsPolicy() func(ctx context.Context, event *nostr.Event) (bool, string) {
 	return func(ctx context.Context, event *nostr.Event) (bool, string) {
 		switch event.Kind {
-		case ChatMessageKind, nostr.KindDeletion, PresenceKind:
+		case ChatMessageKind, nostr.KindDeletion, PresenceKind, ReactionKind:
 			return false, ""
 		case AppDataKind:
 			d := event.Tags.GetD()

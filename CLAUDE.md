@@ -119,6 +119,17 @@ is load-bearing, not incidental:
    linked to the same Hive account. Not extended to other kinds on purpose —
    otherwise one device could delete another device's `hive-link` or a room.
    Denies on any lookup error or missing link.
+   **Reactions** (`reaction.go`, `ReactionKind` = 7, NIP-25): content must be one
+   of the closed `ReactionEmojis` list (the frontend's `REACTION_EMOJIS` must
+   match), tags exactly one `e` (message id), `p` (its author) and `t` (room);
+   the target `kind:9` must exist and its author/room must match the tags, the
+   pubkey must be linked, and the same pubkey can't repeat the same emoji on
+   the same message. The policy re-checks ids/kinds/tags of what the store
+   returns instead of trusting the filter. Removing a reaction is a NIP-09
+   delete, and `NewDeletionOutcome` gives kind 7 the same per-Hive-account rule
+   as kind 9. Reactions have their own IP rate limiter (`SplitRateLimitKind`,
+   20/min burst 40) so they don't eat the chat's. `roomsweep` deletes reactions
+   whose room is gone or whose message no longer exists.
 5. `NewAllowedEventsPolicy` (`allowlist.go`) — catch-all: anything that
    isn't one of the three shapes above is rejected. This is what makes the
    relay single-purpose instead of a generic open relay; it must stay

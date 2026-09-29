@@ -50,7 +50,7 @@ func TestAllowedEventsPolicy_RejectsUnknownAppDataTag(t *testing.T) {
 
 func TestAllowedEventsPolicy_RejectsOtherKinds(t *testing.T) {
 	policy := NewAllowedEventsPolicy()
-	for _, kind := range []int{0, 1, 3, 4, 7, 20000} {
+	for _, kind := range []int{0, 1, 3, 4, 6, 20000} {
 		reject, msg := policy(context.Background(), &nostr.Event{Kind: kind})
 		if !reject || msg == "" {
 			t.Fatalf("debería rechazar eventos de kind %d", kind)
@@ -75,5 +75,12 @@ func TestAllowedEventsPolicy_AcceptsPresenceHeartbeats(t *testing.T) {
 	policy := NewAllowedEventsPolicy()
 	if reject, msg := policy(context.Background(), &nostr.Event{Kind: PresenceKind}); reject {
 		t.Fatalf("los latidos de presencia deberían pasar la lista blanca, rechazado: %s", msg)
+	}
+}
+
+func TestAllowedEventsPolicy_AcceptsReactions(t *testing.T) {
+	policy := NewAllowedEventsPolicy()
+	if reject, msg := policy(context.Background(), &nostr.Event{Kind: ReactionKind}); reject {
+		t.Fatalf("las reacciones (kind 7) deberían pasar la lista blanca, rechazado: %s", msg)
 	}
 }
