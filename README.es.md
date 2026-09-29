@@ -7,7 +7,7 @@
 Relé [Nostr](https://nostr.com/) self-hosted, escrito en Go con
 [khatru](https://github.com/fiatjaf/khatru), pensado como backend de tiempo
 real para un chat descentralizado vinculado a cuentas de
-[Hive](https://hive.io/) (blockchain).
+[Hive](https://hive.io/) (blockchain). Publicación de presentación: [HiveScope Chat](https://peakd.com/hive-139531/@rzazo24/hivescope-chat-a-decentralized-chat-where-your-identity-is-your-hive-account-hivescope-chat-un-chat-descentralizado-donde-tu-i).
 
 A diferencia de un relé "de fábrica" (strfry, nostr-rs-relay, etc.), este
 relé tiene lógica de validación propia: solo acepta los tres tipos de evento

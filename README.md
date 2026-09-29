@@ -7,7 +7,7 @@
 Self-hosted [Nostr](https://nostr.com/) relay written in Go with
 [khatru](https://github.com/fiatjaf/khatru), built as the real-time backend
 for a decentralized chat linked to [Hive](https://hive.io/) (blockchain)
-accounts.
+accounts. Announcement post: [HiveScope Chat](https://peakd.com/hive-139531/@rzazo24/hivescope-chat-a-decentralized-chat-where-your-identity-is-your-hive-account-hivescope-chat-un-chat-descentralizado-donde-tu-i).
 
 Unlike an off-the-shelf relay (strfry, nostr-rs-relay, etc.), this relay has
 its own validation logic: it only accepts the three event types the
