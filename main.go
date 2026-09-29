@@ -89,7 +89,10 @@ func main() {
 	relay.OverwriteDeletionOutcome = append(relay.OverwriteDeletionOutcome, policies.NewDeletionOutcome(db.QueryEvents))
 
 	relay.RejectFilter = append(relay.RejectFilter,
-		khatrupolicies.FilterIPRateLimiter(20, time.Minute, 60),
+		// Cada carga de la web hace ~10 suscripciones (REQ) por la conexión compartida:
+		// con 20/min y ráfaga de 60, unas 6 recargas seguidas dejaban la app sin
+		// lista de salas. Leer es barato; el límite solo frena abusos.
+		khatrupolicies.FilterIPRateLimiter(60, time.Minute, 180),
 	)
 
 	relay.RejectConnection = append(relay.RejectConnection,

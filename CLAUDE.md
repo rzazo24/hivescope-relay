@@ -167,7 +167,9 @@ reply, not with any relay support.
 tag.
 
 `khatrupolicies.FilterIPRateLimiter` / `ConnectionRateLimiter` are wired the
-same way onto `RejectFilter` / `RejectConnection`.
+same way onto `RejectFilter` / `RejectConnection`. The filter (REQ) limiter is 60/min, burst 180 per IP: the
+frontend now shares one connection but still makes ~10 REQs per page load, and
+the old 20/min / burst 60 locked people out after ~6 reloads.
 
 **Room expiration and cleanup**: room-metadata events must carry a NIP-40
 `expiration` tag (validated in `NewRoomMetaPolicy`, required, future unix
