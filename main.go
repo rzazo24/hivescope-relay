@@ -45,13 +45,27 @@ func main() {
 	relay.Info.Name = "hivescope-relay"
 	relay.Info.Description = "Relé Nostr del chat descentralizado de HiveScope, con identidades vinculadas a cuentas Hive"
 
-	db := sqlite3.SQLite3Backend{DatabaseURL: dbPath}
+	// El backend limita por defecto cada consulta a 100 eventos y a 10 valores de
+	// tag por filtro. Eso rompía cosas en silencio: la web pedía 200-5000 y recibía
+	// 100, un `#t` con más de 10 salas fallaba, y roomsweep (que consulta "todos los
+	// kind 30078 / kind 9") veía solo los 100 más nuevos -- con más de 100 filas
+	// consideraría "muertas" salas vivas y borraría sus mensajes. Por eso el
+	// límite interno (políticas y barrido, que usan db.QueryEvents directamente) es
+	// enorme, y a los clientes se les limita aparte, más abajo.
+	db := sqlite3.SQLite3Backend{DatabaseURL: dbPath, QueryLimit: 100000, QueryTagsLimit: 1000}
 	if err := db.Init(); err != nil {
 		log.Fatalf("no se pudo inicializar la base de datos sqlite en %q: %v", dbPath, err)
 	}
 
 	relay.StoreEvent = append(relay.StoreEvent, db.SaveEvent)
-	relay.QueryEvents = append(relay.QueryEvents, db.QueryEvents)
+	// Consultas de clientes (REQ): como mucho clientQueryLimit eventos por filtro,
+	// pidan lo que pidan (o nada). No afecta a las internas de arriba.
+	relay.QueryEvents = append(relay.QueryEvents, func(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
+		if filter.Limit < 1 || filter.Limit > clientQueryLimit {
+			filter.Limit = clientQueryLimit
+		}
+		return db.QueryEvents(ctx, filter)
+	})
 	relay.CountEvents = append(relay.CountEvents, db.CountEvents)
 	relay.DeleteEvent = append(relay.DeleteEvent, db.DeleteEvent)
 	relay.ReplaceEvent = append(relay.ReplaceEvent, db.ReplaceEvent)
@@ -129,6 +143,9 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+// clientQueryLimit es el máximo de eventos por filtro que se le devuelve a un cliente.
+const clientQueryLimit = 2000
 
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

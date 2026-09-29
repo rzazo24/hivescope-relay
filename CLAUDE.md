@@ -171,6 +171,17 @@ same way onto `RejectFilter` / `RejectConnection`. The filter (REQ) limiter is 6
 frontend now shares one connection but still makes ~10 REQs per page load, and
 the old 20/min / burst 60 locked people out after ~6 reloads.
 
+**Query limits** (`main.go`): the sqlite backend silently caps every query at
+100 events and 10 tag values per filter by default. That made the frontend's
+"limit 200/2000/5000" REQs return 100 events, made `#t` filters with >10 rooms
+fail with `TooManyTagValues`, and made anything using `db.QueryEvents` without a
+limit — the policies and `roomsweep`, which assume they see *all* rows of a kind —
+see only the newest 100. So the backend is configured with `QueryLimit: 100000`
+and `QueryTagsLimit: 1000` for internal callers, and clients' REQs go through a
+wrapper capping every filter at `clientQueryLimit` (2000). If you add another
+internal query that needs "everything", it's covered; if a client needs >2000,
+paginate with `until`.
+
 **Room expiration and cleanup**: room-metadata events must carry a NIP-40
 `expiration` tag (validated in `NewRoomMetaPolicy`, required, future unix
 timestamp). Since the metadata event is NIP-33 replaceable, any update
